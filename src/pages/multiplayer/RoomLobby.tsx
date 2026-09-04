@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../../stores/roomStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { RoomEngine } from '../../multiplayer/RoomEngine';
-import { GameRegistry } from '../../engine/GameRegistry';
+import { GameRegistry } from '../../data/games';
+import { getGameComponent } from '../../utils/gameCache';
 import { RoomSettingsPanel } from '../../components/multiplayer/RoomSettingsPanel';
 
 export default function RoomLobby() {
@@ -44,9 +45,7 @@ export default function RoomLobby() {
     return room.settings?.gameId ? GameRegistry.get(room.settings.gameId) : null;
   }, [room.settings?.gameId]);
 
-  const GameComponent = useMemo(() => {
-    return game ? lazy(game.component) : null;
-  }, [game]);
+  const GameComponent = game ? getGameComponent(game) : null;
 
   const handleCopyLink = async () => {
     const canonicalUrl = `${window.location.origin}/room/${roomId?.toUpperCase()}`;

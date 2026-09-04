@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { GameComponentProps } from '../../types/game';
 
 export default function ConnectFourGame({ multiplayerState, multiplayerRole, onMultiplayerAction }: GameComponentProps) {
+  const [hoverCol, setHoverCol] = useState<number | null>(null);
+
   if (!multiplayerState) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -15,8 +17,6 @@ export default function ConnectFourGame({ multiplayerState, multiplayerRole, onM
   const myPlayerId = multiplayerRole === 'player1' ? players[0] : (multiplayerRole === 'player2' ? players[1] : null);
   const isMyTurn = myPlayerId && turn === myPlayerId;
   const myColor = multiplayerRole === 'player1' ? 'RED' : (multiplayerRole === 'player2' ? 'YELLOW' : null);
-
-  const [hoverCol, setHoverCol] = useState<number | null>(null);
 
   const handleColumnClick = (col: number) => {
     if (!isMyTurn || winner || isDraw || board[0][col] !== null) return;

@@ -7,6 +7,8 @@ import { usePlayerStore } from '../stores/playerStore';
 import { GameShell } from '../components/game/GameShell';
 import type { PersonalBest } from '../types/player';
 
+import { getGameComponent } from '../utils/gameCache';
+
 export default function GamePage() {
   const { slug } = useParams<{ slug: string }>();
   const { player, favorites, toggleFavorite } = usePlayerStore();
@@ -48,10 +50,8 @@ export default function GamePage() {
     setIsFav(result);
   };
 
-  // Lazy-load game component
-  const GameComponent = useMemo(() => {
-    return lazy(game.component);
-  }, [game]);
+  // Lazy-load game component safely
+  const GameComponent = game ? getGameComponent(game) : null;
 
   if (playing) {
     return (
