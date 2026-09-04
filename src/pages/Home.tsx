@@ -66,17 +66,17 @@ export default function Home() {
             Play. Challenge. Repeat.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-[slide-up_0.5s_ease-out_0.3s_both]">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-[slide-up_0.5s_ease-out_0.3s_both]">
             <button
               onClick={handleQuickPlay}
-              className="group w-full sm:w-auto px-8 py-3.5 bg-hrsh-accent hover:bg-hrsh-accent-hover text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.97] shadow-lg shadow-hrsh-accent/20 hover:shadow-hrsh-accent/40 hover:shadow-xl"
+              className="group w-full sm:w-auto px-8 py-3.5 btn-3d btn-3d-primary text-sm shadow-lg shadow-hrsh-accent/20"
             >
               <span className="inline-block group-hover:animate-[bounce-in_0.3s] mr-1">⚡</span>
               Quick Play
             </button>
             <Link
               to="/multiplayer"
-              className="w-full sm:w-auto px-8 py-3.5 bg-surface-raised hover:bg-surface-overlay border border-border-default hover:border-border-accent text-text-primary font-semibold rounded-xl text-sm transition-all active:scale-[0.97] text-center"
+              className="w-full sm:w-auto px-8 py-3.5 btn-3d btn-3d-secondary text-sm text-center"
             >
               🎮 Play Online
             </Link>

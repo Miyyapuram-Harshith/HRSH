@@ -12,6 +12,23 @@ This document tracks all the changes, features, and implementations in minute de
 *   Added CSS styles to `src/index.css` and `src/App.css`, establishing a core design system with dark/light themes.
 
 ### 2. Core Application Shell & Layout (Interface Details)
+*   Implemented `AppShell` with responsive sidebar (desktop) and bottom navigation (mobile).
+*   Added `Header` for mobile layout.
+*   Added accessibility features like `skip-to-content` and keyboard navigation.
+
+### 3. Duolingo-Inspired UI Overhaul
+*   Updated `index.css` to introduce `.btn-3d`, `.btn-3d-primary`, `.btn-3d-secondary`, and `.btn-3d-danger`. These replicate the playful, bouncy, thick-bottom-bordered buttons popularized by Duolingo.
+*   Applied `.btn-3d` classes to primary interactive elements across the platform:
+    *   **Home.tsx**: 'Quick Play' and 'Play Online' buttons.
+    *   **GamePage.tsx**: 'Play Now' button.
+    *   **ResultScreen.tsx**: 'Play Again', 'Share', and 'Challenge' buttons.
+*   Rounded edges modified to feel more game-like (using `1rem` border radius for buttons).
+
+### 4. Game Shell & Play Again Logic Fixes
+*   Fixed a critical bug where "Play Again" or "Back" on the `ResultScreen` was not functioning correctly.
+    *   **Issue**: `GameShell`'s `resetGame` call cleared the store's status, but the parent `GamePage` still held `playing=true`. Because React didn't unmount the game component, local state (like `started=true` in `SnakeGame`) was preserved, breaking the play-again loop.
+    *   **Fix**: Introduced `gameKey` state in `GameShell`. When "Play Again" is clicked, `gameKey` increments, and since it is attached to the wrapper `div` holding the game component (`<div key={gameKey}>`), React is forced to unmount and remount the game, effectively resetting all local component state.
+    *   **Fix**: Added an `onQuit` prop to `GameShell` which is passed up to `GamePage` to correctly toggle `playing=false` when the user quits, fixing the "Back" action.
 *   **AppShell Component**: Acts as the main wrapper (`min-h-screen flex flex-col`).
     *   **Offline Indicator**: A banner at the top (`bg-status-warning text-status-warning-fg text-xs font-bold text-center py-1.5 px-4 shadow-sm z-50`) that appears when `navigator.onLine` is false. Displays the message: "You are offline. Solo games will sync when you reconnect."
     *   **Responsive Layout**: Uses flexbox to divide the screen.

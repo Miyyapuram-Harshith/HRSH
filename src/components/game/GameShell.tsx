@@ -10,6 +10,7 @@ import type { GameMetadata, GameResult } from '../../types/game';
 
 interface GameShellProps {
   game: GameMetadata;
+  onQuit?: () => void;
   children: (props: {
     onGameStart: () => void;
     onGameEnd: (result: GameResult) => void;
@@ -20,7 +21,7 @@ interface GameShellProps {
   }) => ReactNode;
 }
 
-export function GameShell({ game, children }: GameShellProps) {
+export function GameShell({ game, onQuit, children }: GameShellProps) {
   const navigate = useNavigate();
   const { player, updateStreak } = usePlayerStore();
   const {
@@ -31,6 +32,7 @@ export function GameShell({ game, children }: GameShellProps) {
   const [elapsed, setElapsed] = useState(0);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [xpGained, setXpGained] = useState(0);
+  const [gameKey, setGameKey] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Timer
@@ -107,13 +109,18 @@ export function GameShell({ game, children }: GameShellProps) {
     setShowResult(false);
     setElapsed(0);
     setXpGained(0);
+    setGameKey(k => k + 1);
     resetGame();
   }, [resetGame]);
 
   const handleQuit = useCallback(() => {
     resetGame();
-    navigate(`/games/${game.slug}`);
-  }, [resetGame, navigate, game.slug]);
+    if (onQuit) {
+      onQuit();
+    } else {
+      navigate(`/games/${game.slug}`);
+    }
+  }, [resetGame, navigate, game.slug, onQuit]);
 
   // Keyboard pause
   useEffect(() => {
@@ -186,14 +193,16 @@ export function GameShell({ game, children }: GameShellProps) {
 
       {/* Game Area */}
       <div className="relative">
-        {children({
-          onGameStart: handleGameStart,
-          onGameEnd: handleGameEnd,
-          onScoreUpdate: handleScoreUpdate,
-          isPaused,
-          onPause: handlePause,
-          onResume: handleResume,
-        })}
+        <div key={gameKey}>
+          {children({
+            onGameStart: handleGameStart,
+            onGameEnd: handleGameEnd,
+            onScoreUpdate: handleScoreUpdate,
+            isPaused,
+            onPause: handlePause,
+            onResume: handleResume,
+          })}
+        </div>
 
         {/* Pause Overlay */}
         {isPaused && (

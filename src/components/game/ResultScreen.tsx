@@ -120,23 +120,23 @@ export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPla
             )}
 
             {/* Actions */}
-            <div className="space-y-2">
+            <div className="space-y-4">
               <button
                 onClick={onPlayAgain}
                 autoFocus
-                className="w-full px-4 py-3 bg-hrsh-accent hover:bg-hrsh-accent-hover text-white font-semibold rounded-xl text-sm transition-all duration-150 active:scale-[0.97] shadow-lg shadow-hrsh-accent/20"
+                className="w-full px-4 py-3.5 btn-3d btn-3d-primary text-sm"
               >
                 Play Again
               </button>
               
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => {
                     import('../../engine/ShareEngine').then(({ ShareEngine }) => {
                       ShareEngine.shareResult(game.id, result.score, result.data);
                     });
                   }}
-                  className="px-4 py-2.5 bg-surface-base border border-border-default hover:bg-surface-overlay font-semibold rounded-xl text-xs transition-colors text-text-secondary active-press"
+                  className="px-4 py-3 btn-3d btn-3d-secondary text-xs"
                 >
                   📤 Share
                 </button>
@@ -147,7 +147,7 @@ export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPla
                       ShareEngine.shareChallenge(game.id, challengeId);
                     });
                   }}
-                  className="px-4 py-2.5 bg-surface-base border border-border-default hover:bg-surface-overlay font-semibold rounded-xl text-xs transition-colors text-text-secondary active-press"
+                  className="px-4 py-3 btn-3d btn-3d-secondary text-xs"
                 >
                   🤝 Challenge
                 </button>

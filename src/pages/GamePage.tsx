@@ -55,7 +55,7 @@ export default function GamePage() {
 
   if (playing) {
     return (
-      <GameShell game={game}>
+      <GameShell game={game} onQuit={() => setPlaying(false)}>
         {(props) => (
           <Suspense fallback={
             <div className="flex items-center justify-center py-20">
@@ -128,7 +128,7 @@ export default function GamePage() {
         <div className="mt-6">
           <button
             onClick={() => setPlaying(true)}
-            className="w-full sm:w-auto px-10 py-3.5 bg-hrsh-accent hover:bg-hrsh-accent-hover text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.98] shadow-lg shadow-hrsh-accent/20"
+            className="w-full sm:w-auto px-10 py-3.5 btn-3d btn-3d-primary text-sm"
           >
             ▶ Play Now
           </button>
