@@ -22,7 +22,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["RoomDurableObject", "LiveIndexDurableObject"]
+      "new_sqlite_classes": ["RoomDurableObject", "LiveIndexDurableObject"]
     }
   ]
 }
