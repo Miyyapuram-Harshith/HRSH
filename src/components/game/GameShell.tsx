@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../../stores/gameStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { ScoreEngine } from '../../engine/ScoreEngine';

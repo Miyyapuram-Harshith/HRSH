@@ -7,7 +7,6 @@ import { AnalyticsEngine } from '../engine/AnalyticsEngine';
 import { ScoreEngine } from '../engine/ScoreEngine';
 import { usePlayerStore } from '../stores/playerStore';
 import { GameCard } from '../components/shared/GameCard';
-import { EmptyState } from '../components/shared/LoadingStates';
 import type { LiveRoom } from '../types/engine';
 import type { GameMetadata } from '../types/game';
 import type { RecentGame } from '../types/player';

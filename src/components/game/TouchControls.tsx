@@ -33,7 +33,7 @@ export function TouchControls({ type }: TouchControlsProps) {
     );
   }
 
-  const dpadButton = (label: string, action: LogicalAction, ariaLabel: string, symbol: string) => (
+  const dpadButton = (action: LogicalAction, ariaLabel: string, symbol: string) => (
     <button
       onTouchStart={(e) => { e.preventDefault(); emit(action); }}
       onMouseDown={() => emit(action)}
@@ -50,17 +50,17 @@ export function TouchControls({ type }: TouchControlsProps) {
         <div className="grid grid-cols-3 gap-1.5 w-fit">
           {/* Top row */}
           <div />
-          {dpadButton('up', 'MOVE_UP', 'Move up', '▲')}
+          {dpadButton('MOVE_UP', 'Move up', '▲')}
           <div />
 
           {/* Middle row */}
-          {dpadButton('left', 'MOVE_LEFT', 'Move left', '◀')}
+          {dpadButton('MOVE_LEFT', 'Move left', '◀')}
           <div />
-          {dpadButton('right', 'MOVE_RIGHT', 'Move right', '▶')}
+          {dpadButton('MOVE_RIGHT', 'Move right', '▶')}
 
           {/* Bottom row */}
           <div />
-          {dpadButton('down', 'MOVE_DOWN', 'Move down', '▼')}
+          {dpadButton('MOVE_DOWN', 'Move down', '▼')}
           <div />
         </div>
 

@@ -3,7 +3,6 @@
 // ============================================================
 
 import { db } from '../lib/db/database';
-import type { PersonalBest } from '../types/player';
 
 export interface LeaderboardEntry {
   rank: number;

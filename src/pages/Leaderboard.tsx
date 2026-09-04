@@ -4,7 +4,6 @@ import { LeaderboardEngine, type LeaderboardEntry } from '../engine/LeaderboardE
 import { GameRegistry } from '../engine/GameRegistry';
 import { usePlayerStore } from '../stores/playerStore';
 import { EmptyState } from '../components/shared/LoadingStates';
-import type { GameMetadata } from '../types/game';
 
 export default function Leaderboard() {
   const { player } = usePlayerStore();

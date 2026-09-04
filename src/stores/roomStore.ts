@@ -28,6 +28,8 @@ interface RoomState {
   gameState: any;
   countdown: number;
   isConnected: boolean;
+  connectionState: 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'ERROR';
+  reconnectAttempts: number;
   error: string | null;
 
   updateState: (state: Partial<RoomState>) => void;
@@ -43,6 +45,8 @@ export const useRoomStore = create<RoomState>((set) => ({
   gameState: null,
   countdown: 0,
   isConnected: false,
+  connectionState: 'DISCONNECTED',
+  reconnectAttempts: 0,
   error: null,
 
   updateState: (newState) => set((state) => ({ ...state, ...newState })),
@@ -55,6 +59,8 @@ export const useRoomStore = create<RoomState>((set) => ({
     gameState: null,
     countdown: 0,
     isConnected: false,
+    connectionState: 'DISCONNECTED',
+    reconnectAttempts: 0,
     error: null
   })
 }));
