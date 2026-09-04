@@ -6,8 +6,15 @@ interface TouchControlsProps {
   onAction?: (action: LogicalAction) => void;
 }
 
+function vibrate(ms = 10) {
+  if (navigator.vibrate) {
+    navigator.vibrate(ms);
+  }
+}
+
 export function TouchControls({ type }: TouchControlsProps) {
   const emit = (action: LogicalAction) => {
+    vibrate(10);
     InputManager.emit(action, 'touch');
   };
 
@@ -17,7 +24,7 @@ export function TouchControls({ type }: TouchControlsProps) {
         <button
           onTouchStart={(e) => { e.preventDefault(); emit('ACTION_PRIMARY'); }}
           onMouseDown={() => emit('ACTION_PRIMARY')}
-          className="w-20 h-20 rounded-full bg-hrsh-accent/20 border-2 border-hrsh-accent/40 active:bg-hrsh-accent/40 active:scale-95 transition-all flex items-center justify-center text-hrsh-accent font-bold text-sm select-none"
+          className="w-20 h-20 rounded-full bg-hrsh-accent/20 border-2 border-hrsh-accent/40 active:bg-hrsh-accent/40 active:scale-90 transition-all flex items-center justify-center text-hrsh-accent font-bold text-sm select-none touch-none"
           aria-label="Action"
         >
           TAP
@@ -26,51 +33,34 @@ export function TouchControls({ type }: TouchControlsProps) {
     );
   }
 
+  const dpadButton = (label: string, action: LogicalAction, ariaLabel: string, symbol: string) => (
+    <button
+      onTouchStart={(e) => { e.preventDefault(); emit(action); }}
+      onMouseDown={() => emit(action)}
+      className="w-14 h-14 rounded-xl bg-surface-overlay border border-border-default active:bg-hrsh-accent/20 active:border-hrsh-accent/40 active:scale-90 transition-all flex items-center justify-center text-lg select-none touch-none"
+      aria-label={ariaLabel}
+    >
+      {symbol}
+    </button>
+  );
+
   return (
     <div className="lg:hidden mt-4">
       <div className="flex justify-center">
-        <div className="grid grid-cols-3 gap-1 w-fit">
+        <div className="grid grid-cols-3 gap-1.5 w-fit">
           {/* Top row */}
           <div />
-          <button
-            onTouchStart={(e) => { e.preventDefault(); emit('MOVE_UP'); }}
-            onMouseDown={() => emit('MOVE_UP')}
-            className="w-14 h-14 rounded-xl bg-surface-overlay active:bg-surface-hover active:scale-95 transition-all flex items-center justify-center text-lg select-none"
-            aria-label="Move up"
-          >
-            ▲
-          </button>
+          {dpadButton('up', 'MOVE_UP', 'Move up', '▲')}
           <div />
 
           {/* Middle row */}
-          <button
-            onTouchStart={(e) => { e.preventDefault(); emit('MOVE_LEFT'); }}
-            onMouseDown={() => emit('MOVE_LEFT')}
-            className="w-14 h-14 rounded-xl bg-surface-overlay active:bg-surface-hover active:scale-95 transition-all flex items-center justify-center text-lg select-none"
-            aria-label="Move left"
-          >
-            ◀
-          </button>
+          {dpadButton('left', 'MOVE_LEFT', 'Move left', '◀')}
           <div />
-          <button
-            onTouchStart={(e) => { e.preventDefault(); emit('MOVE_RIGHT'); }}
-            onMouseDown={() => emit('MOVE_RIGHT')}
-            className="w-14 h-14 rounded-xl bg-surface-overlay active:bg-surface-hover active:scale-95 transition-all flex items-center justify-center text-lg select-none"
-            aria-label="Move right"
-          >
-            ▶
-          </button>
+          {dpadButton('right', 'MOVE_RIGHT', 'Move right', '▶')}
 
           {/* Bottom row */}
           <div />
-          <button
-            onTouchStart={(e) => { e.preventDefault(); emit('MOVE_DOWN'); }}
-            onMouseDown={() => emit('MOVE_DOWN')}
-            className="w-14 h-14 rounded-xl bg-surface-overlay active:bg-surface-hover active:scale-95 transition-all flex items-center justify-center text-lg select-none"
-            aria-label="Move down"
-          >
-            ▼
-          </button>
+          {dpadButton('down', 'MOVE_DOWN', 'Move down', '▼')}
           <div />
         </div>
 
@@ -79,7 +69,7 @@ export function TouchControls({ type }: TouchControlsProps) {
             <button
               onTouchStart={(e) => { e.preventDefault(); emit('ACTION_PRIMARY'); }}
               onMouseDown={() => emit('ACTION_PRIMARY')}
-              className="w-14 h-14 rounded-full bg-hrsh-accent/20 border-2 border-hrsh-accent/40 active:bg-hrsh-accent/40 active:scale-95 transition-all flex items-center justify-center select-none"
+              className="w-14 h-14 rounded-full bg-hrsh-accent/20 border-2 border-hrsh-accent/40 active:bg-hrsh-accent/40 active:scale-90 transition-all flex items-center justify-center select-none touch-none"
               aria-label="Action"
             >
               ●

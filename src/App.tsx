@@ -13,6 +13,7 @@ const Multiplayer = lazy(() => import('./pages/Multiplayer'));
 const CreateRoom = lazy(() => import('./pages/multiplayer/CreateRoom'));
 const RoomLobby = lazy(() => import('./pages/multiplayer/RoomLobby'));
 const Challenges = lazy(() => import('./pages/Challenges'));
+const Leaderboard = lazy(() => import('./pages/Leaderboard'));
 const Profile = lazy(() => import('./pages/Profile'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
@@ -42,8 +43,8 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-surface-base">
-        <div className="flex flex-col items-center gap-4">
-          <h1 className="text-3xl font-bold tracking-tight">HRSH</h1>
+        <div className="flex flex-col items-center gap-4 animate-[fade-in_0.3s_ease-out]">
+          <h1 className="text-4xl font-black tracking-tighter gradient-text">HRSH</h1>
           <div className="w-8 h-8 border-2 border-hrsh-accent border-t-transparent rounded-full animate-spin" />
         </div>
       </div>
@@ -65,11 +66,8 @@ export default function App() {
             <Route path="/multiplayer" element={<Multiplayer />} />
             <Route path="/room/create" element={<CreateRoom />} />
             <Route path="/room/:roomId" element={<RoomLobby />} />
-            <Route path="/challenges" element={
-              <Suspense fallback={<div className="p-8 text-text-muted">Loading...</div>}>
-                <Challenges />
-              </Suspense>
-            } />
+            <Route path="/challenges" element={<Challenges />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />

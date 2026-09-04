@@ -9,6 +9,7 @@
   --color-hrsh-accent: #3b82f6;
   --color-hrsh-accent-hover: #2563eb;
   --color-hrsh-accent-subtle: #3b82f620;
+  --color-hrsh-glow: #60a5fa;
 
   /* Surfaces */
   --color-surface-base: #09090b;
@@ -32,6 +33,18 @@
   --color-status-warning: #f59e0b;
   --color-status-error: #ef4444;
   --color-status-live: #ef4444;
+  --color-status-warning-fg: #fefce8;
+
+  /* Rarity Colors */
+  --color-rarity-common: #a1a1aa;
+  --color-rarity-uncommon: #22c55e;
+  --color-rarity-rare: #3b82f6;
+  --color-rarity-epic: #a855f7;
+  --color-rarity-legendary: #f59e0b;
+
+  /* XP / Level */
+  --color-xp-bar: #8b5cf6;
+  --color-xp-bar-bg: #27272a;
 
   /* Game-specific accents are applied via inline styles from GameMetadata.color */
 
@@ -54,14 +67,29 @@
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
   --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-glow-accent: 0 0 20px rgba(59, 130, 246, 0.3), 0 0 60px rgba(59, 130, 246, 0.1);
 
   /* Animations */
   --animate-fade-in: fade-in 0.2s ease-out;
   --animate-slide-up: slide-up 0.3s ease-out;
+  --animate-slide-down: slide-down 0.3s ease-out;
+  --animate-slide-in-right: slide-in-right 0.3s ease-out;
+  --animate-slide-out-right: slide-out-right 0.3s ease-out;
   --animate-scale-in: scale-in 0.2s ease-out;
   --animate-pop: pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-bounce-in: bounce-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+  --animate-shimmer: shimmer-text 3s ease-in-out infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-ripple: ripple 1.5s ease-out infinite;
+  --animate-confetti: confetti 1s ease-out forwards;
+  --animate-count-up: count-up 0.6s ease-out;
+  --animate-shake: shake 0.5s ease-in-out;
 }
+
+/* ============================================================
+   Keyframes
+   ============================================================ */
 
 @keyframes fade-in {
   from { opacity: 0; }
@@ -71,6 +99,21 @@
 @keyframes slide-up {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-out-right {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
 }
 
 @keyframes scale-in {
@@ -84,9 +127,72 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
+@keyframes bounce-in {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.08); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+
+@keyframes shimmer-text {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-200px) rotate(720deg); opacity: 0; }
+}
+
+@keyframes count-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.1); }
+}
+
+@keyframes toast-progress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+@keyframes stagger-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes particle-float {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { transform: translate(var(--tx, 20px), var(--ty, -60px)) scale(0); opacity: 0; }
 }
 
 /* ============================================================
@@ -114,6 +220,77 @@ body {
 .safe-area-right { padding-right: env(safe-area-inset-right, 0); }
 
 /* ============================================================
+   Utility Classes
+   ============================================================ */
+
+.gradient-text {
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer-text 4s ease-in-out infinite;
+}
+
+.glass-card {
+  background: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(39, 39, 42, 0.8);
+}
+
+.glow-border {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.1);
+}
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  will-change: transform;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-elevated);
+}
+
+.active-press {
+  transition: transform 0.1s ease;
+}
+.active-press:active {
+  transform: scale(0.97);
+}
+
+/* Stagger animation delay helpers */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* XP Progress Bar */
+.xp-bar {
+  background: var(--color-xp-bar-bg);
+  border-radius: 9999px;
+  overflow: hidden;
+  height: 6px;
+}
+.xp-bar-fill {
+  background: linear-gradient(90deg, var(--color-xp-bar), #c084fc);
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Scrollbar hide */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
    Reduced Motion
    ============================================================ */
 
@@ -122,6 +299,9 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .gradient-text {
+    animation: none;
   }
 }
 
@@ -155,6 +335,24 @@ body {
   outline: 2px solid var(--color-hrsh-accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* Skip to content link */
+.skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-hrsh-accent);
+  color: white;
+  padding: 8px 16px;
+  z-index: 100;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 0 0 var(--radius-md) 0;
+  transition: top 0.2s ease;
+}
+.skip-to-content:focus {
+  top: 0;
 }
 
 /* ============================================================
@@ -198,4 +396,43 @@ body {
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-md);
+}
+
+/* ============================================================
+   Toast Progress Bar
+   ============================================================ */
+
+.toast-progress {
+  height: 2px;
+  background: var(--color-hrsh-accent);
+  animation: toast-progress 4s linear forwards;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+/* ============================================================
+   Confetti Particles
+   ============================================================ */
+
+.confetti-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 200;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confetti-fall 2.5s ease-in forwards;
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
 }

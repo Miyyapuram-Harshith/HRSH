@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useGameStore } from '../../stores/gameStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { ScoreEngine } from '../../engine/ScoreEngine';
@@ -21,15 +21,41 @@ interface GameShellProps {
 }
 
 export function GameShell({ game, children }: GameShellProps) {
+  const navigate = useNavigate();
   const { player, updateStreak } = usePlayerStore();
   const {
     status, score, isPaused, lastResult, wasPersonalBest,
     startGame, updateScore, pauseGame, resumeGame, endGame, resetGame, addAchievement,
   } = useGameStore();
   const [showResult, setShowResult] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [xpGained, setXpGained] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Timer
+  useEffect(() => {
+    if (status === 'playing' && !isPaused) {
+      timerRef.current = setInterval(() => {
+        setElapsed((e) => e + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [status, isPaused]);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
 
   const handleGameStart = useCallback(() => {
     startGame(game.id);
+    setElapsed(0);
     AnalyticsEngine.track('GAME_START', { gameId: game.id });
   }, [game.id, startGame]);
 
@@ -38,6 +64,12 @@ export function GameShell({ game, children }: GameShellProps) {
 
     const isPersonalBest = await ScoreEngine.recordResult(player.id, result);
     endGame(result, isPersonalBest);
+
+    // Calculate XP
+    let xp = 10; // base
+    if (result.won) xp += 15;
+    xp += Math.floor(result.score / 100);
+    setXpGained(xp);
 
     // Update streak
     await updateStreak();
@@ -68,12 +100,20 @@ export function GameShell({ game, children }: GameShellProps) {
 
   const handleResume = useCallback(() => {
     resumeGame();
+    setShowQuitConfirm(false);
   }, [resumeGame]);
 
   const handlePlayAgain = useCallback(() => {
     setShowResult(false);
+    setElapsed(0);
+    setXpGained(0);
     resetGame();
   }, [resetGame]);
+
+  const handleQuit = useCallback(() => {
+    resetGame();
+    navigate(`/games/${game.slug}`);
+  }, [resetGame, navigate, game.slug]);
 
   // Keyboard pause
   useEffect(() => {
@@ -96,12 +136,20 @@ export function GameShell({ game, children }: GameShellProps) {
       {/* Game Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link
-            to={`/games/${game.slug}`}
+          <button
+            onClick={() => {
+              if (status === 'playing') {
+                handlePause();
+                setShowQuitConfirm(true);
+              } else {
+                handleQuit();
+              }
+            }}
             className="text-text-muted hover:text-text-secondary transition-colors text-sm"
+            aria-label="Go back"
           >
             ← Back
-          </Link>
+          </button>
           <div className="flex items-center gap-2">
             <span>{game.icon}</span>
             <h1 className="text-base font-semibold">{game.title}</h1>
@@ -109,9 +157,16 @@ export function GameShell({ game, children }: GameShellProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Timer */}
+          {status !== 'idle' && (
+            <div className="text-text-muted text-xs font-mono tabular-nums">
+              {formatTime(elapsed)}
+            </div>
+          )}
+
           {/* Score */}
           {status !== 'idle' && (
-            <div className="font-mono text-sm font-bold tabular-nums" style={{ color: game.color }}>
+            <div className="font-mono text-sm font-bold tabular-nums animate-[count-up_0.3s_ease-out]" style={{ color: game.color }}>
               {score.toLocaleString()}
             </div>
           )}
@@ -120,7 +175,7 @@ export function GameShell({ game, children }: GameShellProps) {
           {status === 'playing' && (
             <button
               onClick={handlePause}
-              className="w-8 h-8 rounded-lg bg-surface-overlay hover:bg-surface-hover flex items-center justify-center transition-colors text-sm"
+              className="w-8 h-8 rounded-lg bg-surface-overlay hover:bg-surface-hover flex items-center justify-center transition-colors text-sm active-press"
               aria-label="Pause game"
             >
               ⏸
@@ -143,28 +198,55 @@ export function GameShell({ game, children }: GameShellProps) {
         {/* Pause Overlay */}
         {isPaused && (
           <div className="absolute inset-0 bg-surface-base/80 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 animate-[fade-in_0.15s_ease-out]">
-            <div className="text-center space-y-4">
+            <div className="text-center space-y-4 animate-[scale-in_0.2s_ease-out]">
               <h2 className="text-xl font-bold">Paused</h2>
+              <div className="text-text-muted text-sm font-mono tabular-nums mb-2">
+                {formatTime(elapsed)} · {score.toLocaleString()} pts
+              </div>
               <div className="flex flex-col gap-2">
                 <button
                   onClick={handleResume}
-                  className="px-6 py-2.5 bg-hrsh-accent hover:bg-hrsh-accent-hover text-white rounded-xl font-medium text-sm transition-colors"
+                  className="px-6 py-2.5 bg-hrsh-accent hover:bg-hrsh-accent-hover text-white rounded-xl font-medium text-sm transition-colors active-press"
+                  autoFocus
                 >
                   Resume
                 </button>
                 <button
                   onClick={handlePlayAgain}
-                  className="px-6 py-2.5 bg-surface-overlay hover:bg-surface-hover text-text-primary rounded-xl font-medium text-sm transition-colors"
+                  className="px-6 py-2.5 bg-surface-overlay hover:bg-surface-hover text-text-primary rounded-xl font-medium text-sm transition-colors active-press"
                 >
                   Restart
                 </button>
-                <Link
-                  to="/"
-                  onClick={() => resetGame()}
-                  className="px-6 py-2.5 text-text-muted hover:text-text-secondary text-sm transition-colors"
+                <button
+                  onClick={handleQuit}
+                  className="px-6 py-2.5 text-text-muted hover:text-status-error text-sm transition-colors"
                 >
                   Quit
-                </Link>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quit confirmation overlay */}
+        {showQuitConfirm && !isPaused && (
+          <div className="absolute inset-0 bg-surface-base/80 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 animate-[fade-in_0.15s_ease-out]">
+            <div className="text-center space-y-4 animate-[scale-in_0.2s_ease-out]">
+              <h2 className="text-lg font-bold">Quit Game?</h2>
+              <p className="text-text-muted text-sm">Your progress will be lost.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowQuitConfirm(false); handleResume(); }}
+                  className="px-5 py-2 bg-surface-overlay hover:bg-surface-hover rounded-xl text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleQuit}
+                  className="px-5 py-2 bg-status-error hover:bg-status-error/90 text-white rounded-xl text-sm font-medium transition-colors"
+                >
+                  Quit
+                </button>
               </div>
             </div>
           </div>
@@ -177,6 +259,7 @@ export function GameShell({ game, children }: GameShellProps) {
           game={game}
           result={lastResult}
           isPersonalBest={wasPersonalBest}
+          xpGained={xpGained}
           onPlayAgain={handlePlayAgain}
         />
       )}
