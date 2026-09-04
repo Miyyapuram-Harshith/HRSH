@@ -61,8 +61,18 @@ export class PlayerService {
     return player;
   }
 
-  static async updateName(playerId: string, name: string): Promise<void> {
+  static async updateName(playerId: string, name: string): Promise<Player> {
     await db.players.update(playerId, { name, updatedAt: Date.now() });
+    const player = await db.players.get(playerId);
+    if (!player) throw new Error('Player not found');
+    return player;
+  }
+
+  static async setPremium(playerId: string, isPremium: boolean): Promise<Player> {
+    await db.players.update(playerId, { isPremium, updatedAt: Date.now() });
+    const player = await db.players.get(playerId);
+    if (!player) throw new Error('Player not found');
+    return player;
   }
 
   static async getSettings(playerId: string): Promise<PlayerSettings | undefined> {

@@ -18,6 +18,7 @@ interface PlayerState {
   // Actions
   initialize: () => Promise<void>;
   setName: (name: string) => Promise<void>;
+  setPremium: (isPremium: boolean) => Promise<void>;
   updateSettings: (updates: Partial<PlayerSettings>) => Promise<void>;
   updateStreak: () => Promise<void>;
   addStreakFreeze: () => Promise<void>;
@@ -60,8 +61,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setName: async (name: string) => {
     const { player } = get();
     if (!player) return;
-    await PlayerService.updateName(player.id, name);
-    set({ player: { ...player, name }, isFirstVisit: false, showOnboarding: false });
+    const newPlayer = await PlayerService.updateName(player.id, name);
+    set({ player: newPlayer });
+  },
+
+  setPremium: async (isPremium: boolean) => {
+    const { player } = get();
+    if (!player) return;
+    const newPlayer = await PlayerService.setPremium(player.id, isPremium);
+    set({ player: newPlayer });
   },
 
   updateSettings: async (updates: Partial<PlayerSettings>) => {

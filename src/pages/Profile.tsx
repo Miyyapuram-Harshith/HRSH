@@ -149,6 +149,30 @@ export default function Profile() {
         </div>
       )}
 
+      {/* HRSH Premium */}
+      <div className="bg-gradient-to-r from-hrsh-accent/10 to-transparent border border-hrsh-accent/30 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-hrsh-accent flex items-center gap-2">
+              HRSH Premium <span>✨</span>
+            </h2>
+            <p className="text-xs text-text-muted mt-1">
+              {player.isPremium ? 'You are a Premium member.' : 'Upgrade to remove ads.'}
+            </p>
+          </div>
+          <button
+            onClick={() => usePlayerStore.getState().setPremium(!player.isPremium)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+              player.isPremium
+                ? 'bg-surface-base border border-border-default text-text-muted'
+                : 'bg-hrsh-accent text-white hover:bg-hrsh-accent-hover'
+            }`}
+          >
+            {player.isPremium ? 'Cancel Premium' : 'Buy for $2.99'}
+          </button>
+        </div>
+      </div>
+
       {/* Achievements */}
       <div>
         <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">

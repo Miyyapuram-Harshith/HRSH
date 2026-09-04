@@ -7,6 +7,7 @@ export interface Player {
   name: string;
   createdAt: number;
   updatedAt: number;
+  isPremium?: boolean;
 }
 
 export interface PlayerSettings {
