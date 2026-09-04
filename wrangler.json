@@ -1,8 +1,12 @@
 {
-  "name": "hrsh-backend",
-  "main": "src/index.ts",
+  "name": "hrsh",
+  "main": "worker/src/index.ts",
   "compatibility_date": "2024-03-20",
   "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
   "durable_objects": {
     "bindings": [
       {
@@ -20,8 +24,5 @@
       "tag": "v1",
       "new_classes": ["RoomDurableObject", "LiveIndexDurableObject"]
     }
-  ],
-  "build": {
-    "command": "npm run build:worker"
-  }
+  ]
 }

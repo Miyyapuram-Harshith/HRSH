@@ -1,6 +1,7 @@
 export interface Env {
   ROOM: DurableObjectNamespace;
   LIVE_INDEX: DurableObjectNamespace;
+  ASSETS: Fetcher;
 }
 
 export { RoomDurableObject } from './RoomDurableObject';
@@ -41,6 +42,24 @@ export default {
           'Access-Control-Allow-Origin': '*',
         },
       });
+    }
+
+    // Serve static assets for all other routes
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      try {
+        let response = await env.ASSETS.fetch(request);
+        
+        // SPA Fallback: if asset not found, serve index.html
+        if (response.status === 404) {
+          const indexUrl = new URL(request.url);
+          indexUrl.pathname = '/index.html';
+          response = await env.ASSETS.fetch(new Request(indexUrl, request));
+        }
+        
+        return response;
+      } catch (err) {
+        return new Response('Internal Error fetching assets', { status: 500 });
+      }
     }
 
     return new Response('Not Found', { status: 404 });
