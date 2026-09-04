@@ -3,9 +3,13 @@ import { create } from 'zustand';
 export interface PlayerInfo {
   id: string;
   name: string;
-  isReady: boolean;
   isHost: boolean;
+  isReady: boolean;
   isSpectator: boolean;
+  progress?: number;
+  liveMetricValue?: number;
+  rank?: number;
+  finished?: boolean;
 }
 
 export interface RoomSettings {
@@ -22,7 +26,7 @@ export interface RoomSettings {
 
 interface RoomState {
   roomId: string | null;
-  status: 'LOBBY' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISHED';
+  status: 'WAITING' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISHING' | 'RESULTS' | 'CLOSED';
   settings: RoomSettings | null;
   players: PlayerInfo[];
   gameState: any;
@@ -39,7 +43,7 @@ interface RoomState {
 
 export const useRoomStore = create<RoomState>((set) => ({
   roomId: null,
-  status: 'LOBBY',
+  status: 'WAITING',
   settings: null,
   players: [],
   gameState: null,
@@ -53,7 +57,7 @@ export const useRoomStore = create<RoomState>((set) => ({
   setError: (error) => set({ error }),
   reset: () => set({
     roomId: null,
-    status: 'LOBBY',
+    status: 'WAITING',
     settings: null,
     players: [],
     gameState: null,

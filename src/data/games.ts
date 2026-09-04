@@ -26,6 +26,7 @@ const games: GameMetadata[] = [
     tags: ['arcade', 'classic', 'reflexes'],
     color: '#22c55e',
     icon: '🐍',
+    settingsSchema: GAME_SCHEMAS['snake'],
     component: () => import('../games/snake/SnakeGame'),
   },
   {
@@ -43,6 +44,7 @@ const games: GameMetadata[] = [
     tags: ['puzzle', 'strategy', 'numbers'],
     color: '#f59e0b',
     icon: '🧮',
+    settingsSchema: GAME_SCHEMAS['2048'],
     component: () => import('../games/twenty48/Twenty48Game'),
   },
   {
@@ -60,6 +62,7 @@ const games: GameMetadata[] = [
     tags: ['reflexes', 'speed', 'test'],
     color: '#ef4444',
     icon: '⚡',
+    settingsSchema: GAME_SCHEMAS['reaction-test'],
     component: () => import('../games/reaction/ReactionGame'),
   },
   {
@@ -82,6 +85,7 @@ const games: GameMetadata[] = [
     tags: ['puzzle', 'logic', 'classic'],
     color: '#6366f1',
     icon: '💣',
+    settingsSchema: GAME_SCHEMAS['minesweeper'],
     component: () => import('../games/minesweeper/MinesweeperGame'),
   },
   {
@@ -104,6 +108,7 @@ const games: GameMetadata[] = [
     tags: ['puzzle', 'logic', 'numbers'],
     color: '#0ea5e9',
     icon: '🔢',
+    settingsSchema: GAME_SCHEMAS['sudoku'],
     component: () => import('../games/sudoku/SudokuGame'),
   },
   {
@@ -125,6 +130,13 @@ const games: GameMetadata[] = [
     tags: ['typing', 'speed', 'wpm'],
     color: '#8b5cf6',
     icon: '⌨️',
+    settingsSchema: GAME_SCHEMAS['typing-test'],
+    matchProfile: {
+      progressMetric: 'textCompletion',
+      liveMetric: 'wpm',
+      finishCondition: 'completion',
+      resultShape: 'ranked'
+    },
     component: () => import('../games/typing/TypingGame'),
   },
 
@@ -175,6 +187,34 @@ const games: GameMetadata[] = [
     room: { visibility: ['private', 'public'], spectators: true, autoStart: false, countdown: [3, 5], rematch: true },
     component: () => import('../games/connectfour/ConnectFourGame'),
   },
+  {
+    id: 'chess',
+    slug: 'chess',
+    title: 'Chess',
+    description: 'The classic game of strategy. Play online with friends, complete with time controls, legal move validation, and a beautiful responsive board.',
+    shortDescription: 'The ultimate strategy game.',
+    category: 'duels',
+    multiplayer: true,
+    minPlayers: 2,
+    maxPlayers: 2,
+    difficulty: 'hard',
+    modes: [
+      { id: 'casual', label: 'Casual' },
+    ],
+    controls: { keyboard: [], touch: true, mouse: true },
+    tags: ['strategy', 'board', 'classic'],
+    color: '#d4d4d8',
+    icon: '♟️',
+    settingsSchema: GAME_SCHEMAS['chess'],
+    matchProfile: {
+      progressMetric: 'boardState',
+      liveMetric: 'winDrawLoss',
+      finishCondition: 'checkmate',
+      resultShape: 'headToHead'
+    },
+    room: { visibility: ['private', 'public'], spectators: true, autoStart: false, countdown: [0], rematch: true },
+    component: () => import('../games/chess/ChessGame'),
+  },
 
   // ---- PARTY ----
   {
@@ -198,6 +238,12 @@ const games: GameMetadata[] = [
     color: '#10b981',
     icon: '🐍',
     settingsSchema: GAME_SCHEMAS['snake-arena'],
+    matchProfile: {
+      progressMetric: 'survivalScore',
+      liveMetric: 'score',
+      finishCondition: 'elimination',
+      resultShape: 'ranked'
+    },
     room: { visibility: ['private', 'public'], spectators: true, autoStart: true, countdown: [3, 5, 10], rematch: true },
     component: () => import('../games/snake-arena/SnakeArenaGame'),
   },

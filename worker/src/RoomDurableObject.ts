@@ -1,5 +1,6 @@
 import { Env } from './index';
 import { GAME_SCHEMAS } from '../../src/data/gameSchemas';
+import { Chess } from 'chess.js';
 
 export interface RoomSettings {
   gameId: string;
@@ -21,9 +22,14 @@ interface Player {
   isHost: boolean;
   isSpectator: boolean;
   ws?: WebSocket;
+  // Match Engine generic fields
+  progress: number;
+  liveMetricValue: number;
+  rank?: number;
+  finished: boolean;
 }
 
-type RoomStatus = 'LOBBY' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISHED';
+type RoomStatus = 'WAITING' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISHING' | 'RESULTS' | 'CLOSED';
 
 export class RoomDurableObject {
   private state: DurableObjectState;
@@ -31,47 +37,43 @@ export class RoomDurableObject {
   
   private players: Map<string, Player> = new Map();
   private settings: RoomSettings | null = null;
-  private status: RoomStatus = 'LOBBY';
+  private status: RoomStatus = 'WAITING';
   private roomId: string;
   private isCreated: boolean = false;
+  
   private gameState: any = null; // Authoritative game state
   private countdownTimer: any = null;
   private countdownValue: number = 0;
+  
   private gameTickTimer: any = null;
+  private progressTickTimer: any = null; // For high-frequency throttled broadcasts
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
     this.env = env;
-    // We don't have the room ID directly, but we can extract it if needed or assume it's part of the state
-    this.roomId = 'unknown'; // Will be set on first connect or init
+    this.roomId = 'unknown'; 
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    
-    // Extract roomId from URL path (e.g. /api/room/X7K9Q or /api/init/X7K9Q)
     const segments = url.pathname.split('/');
     this.roomId = segments[3];
 
-    // Explicit room initialization
     if (url.pathname.startsWith('/api/init/') && request.method === 'POST') {
       this.isCreated = true;
       return new Response('OK');
     }
 
-    // Handle WebSocket upgrade
     if (request.headers.get('Upgrade') === 'websocket') {
       if (!this.isCreated) {
         return new Response('Room Not Found', { status: 404 });
       }
 
       const [client, server] = Object.values(new WebSocketPair());
-      
       const playerId = url.searchParams.get('playerId') || 'unknown';
       const playerName = url.searchParams.get('playerName') || 'Anonymous';
       
       await this.handleWebSocket(server, playerId, playerName);
-      
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -81,10 +83,8 @@ export class RoomDurableObject {
   private async handleWebSocket(ws: WebSocket, playerId: string, playerName: string) {
     this.state.acceptWebSocket(ws);
 
-    // If room is new, first player is host
     const isHost = this.players.size === 0;
     
-    // Initialize default settings if first player
     if (!this.settings) {
       this.settings = {
         gameId: 'tic-tac-toe',
@@ -117,6 +117,9 @@ export class RoomDurableObject {
       isHost,
       isSpectator,
       ws,
+      progress: 0,
+      liveMetricValue: 0,
+      finished: false
     };
 
     this.players.set(playerId, player);
@@ -143,10 +146,9 @@ export class RoomDurableObject {
 
     switch (msg.type) {
       case 'ROOM_SETTINGS_UPDATE':
-        if (player.isHost && this.status === 'LOBBY') {
+        if (player.isHost && this.status === 'WAITING') {
           const newSettings = { ...this.settings, ...msg.settings } as RoomSettings;
           
-          // Validate gameSettings against schema
           if (newSettings.gameSettings && newSettings.gameId) {
             const schema = GAME_SCHEMAS[newSettings.gameId];
             if (schema) {
@@ -154,7 +156,6 @@ export class RoomDurableObject {
               for (const s of schema) {
                 const val = newSettings.gameSettings[s.key];
                 if (val !== undefined) {
-                  // Basic validation: ensure number if it's a number/slider type
                   if (s.type === 'slider' || s.type === 'number') {
                     validatedGameSettings[s.key] = Number(val) || s.defaultValue;
                   } else {
@@ -175,7 +176,7 @@ export class RoomDurableObject {
         break;
 
       case 'TOGGLE_READY':
-        if (this.status === 'LOBBY') {
+        if (this.status === 'WAITING') {
           player.isReady = !player.isReady;
           this.broadcastState();
           this.checkAutoStart();
@@ -183,7 +184,7 @@ export class RoomDurableObject {
         break;
 
       case 'START_NOW':
-        if (player.isHost && this.status === 'LOBBY') {
+        if (player.isHost && this.status === 'WAITING') {
           this.startCountdown();
         }
         break;
@@ -200,21 +201,47 @@ export class RoomDurableObject {
         break;
 
       case 'GAME_ACTION':
-        if (this.status === 'PLAYING') {
+        if (this.status === 'PLAYING' || this.status === 'FINISHING') {
           this.processGameAction(playerId, msg.action);
         }
         break;
 
+      case 'MATCH_PROGRESS':
+        if (this.status === 'PLAYING' || this.status === 'FINISHING') {
+          if (!player.finished) {
+            player.progress = msg.payload.progress;
+            player.liveMetricValue = msg.payload.liveMetricValue;
+          }
+        }
+        break;
+
+      case 'MATCH_FINISHED':
+        if (this.status === 'PLAYING' || this.status === 'FINISHING') {
+          player.finished = true;
+          player.progress = msg.payload.progress;
+          player.liveMetricValue = msg.payload.liveMetricValue;
+          this.checkMatchEnd();
+        }
+        break;
+
       case 'REMATCH':
-        if (this.status === 'FINISHED' && player.isHost) {
-          this.status = 'LOBBY';
+        if (this.status === 'RESULTS' && player.isHost) {
+          this.status = 'WAITING';
           this.gameState = null;
           if (this.gameTickTimer) {
             clearInterval(this.gameTickTimer);
             this.gameTickTimer = null;
           }
+          if (this.progressTickTimer) {
+            clearInterval(this.progressTickTimer);
+            this.progressTickTimer = null;
+          }
           for (const p of this.players.values()) {
             p.isReady = false;
+            p.progress = 0;
+            p.liveMetricValue = 0;
+            p.finished = false;
+            p.rank = undefined;
           }
           this.broadcastState();
         }
@@ -234,7 +261,6 @@ export class RoomDurableObject {
   private startCountdown() {
     this.status = 'COUNTDOWN';
     this.countdownValue = this.settings?.countdownSeconds || 3;
-    
     this.broadcastState();
 
     if (this.countdownTimer) clearInterval(this.countdownTimer);
@@ -294,6 +320,18 @@ export class RoomDurableObject {
       
       if (this.gameTickTimer) clearInterval(this.gameTickTimer);
       this.gameTickTimer = setInterval(() => this.tickSnakeArena(), 150);
+    } else if (this.settings?.gameId === 'chess') {
+      const chess = new Chess();
+      this.gameState = {
+        players: activePlayers,
+        turn: activePlayers[0], // White
+        fen: chess.fen(),
+        history: [],
+        winner: null,
+        isDraw: false,
+        whiteId: activePlayers[0],
+        blackId: activePlayers[1] || null
+      };
     } else if (this.settings?.gameId === 'word-guesser') {
       this.gameState = {
         players: activePlayers,
@@ -305,6 +343,19 @@ export class RoomDurableObject {
         timeRemaining: 60,
         winner: null
       };
+    } else if (this.settings?.gameId === 'typing-test') {
+      // Typing Race uses the MatchEngine progress system
+      this.gameState = {
+        challenge: 'This is a sample text for the typing race. We will implement server-side text generation soon.',
+        duration: this.settings?.gameSettings?.duration || 60,
+        startTime: Date.now()
+      };
+      
+      if (this.progressTickTimer) clearInterval(this.progressTickTimer);
+      this.progressTickTimer = setInterval(() => this.tickProgressBroadcast(), 500);
+      
+      // Also set a timer for the match duration
+      setTimeout(() => this.endMatch(), this.gameState.duration * 1000 + 2000); // 2s buffer
     }
 
     this.broadcastState();
@@ -313,7 +364,11 @@ export class RoomDurableObject {
 
   private processGameAction(playerId: string, action: any) {
     if (!this.gameState || this.gameState.winner || this.gameState.isDraw) return;
-    if (this.gameState.turn !== playerId) return; // Not their turn
+    
+    // Most turn-based games
+    if (this.settings?.gameId !== 'snake-arena' && this.settings?.gameId !== 'typing-test') {
+       if (this.gameState.turn !== playerId) return; 
+    }
 
     if (this.settings?.gameId === 'tic-tac-toe') {
       if (action.type === 'PLACE' && typeof action.index === 'number') {
@@ -321,13 +376,11 @@ export class RoomDurableObject {
         if (index >= 0 && index < 9 && this.gameState.board[index] === null) {
           const playerSymbol = this.gameState.players.indexOf(playerId) === 0 ? 'X' : 'O';
           this.gameState.board[index] = playerSymbol;
-          
           this.checkTicTacToeWin();
-          
           if (!this.gameState.winner && !this.gameState.isDraw) {
             this.gameState.turn = this.gameState.players.find((id: string) => id !== playerId);
           } else {
-            this.status = 'FINISHED';
+            this.status = 'RESULTS';
           }
           this.broadcastState();
         }
@@ -337,7 +390,6 @@ export class RoomDurableObject {
         const { col } = action;
         if (col >= 0 && col < 7) {
           const playerColor = this.gameState.players.indexOf(playerId) === 0 ? 'RED' : 'YELLOW';
-          // Find lowest empty row
           let row = -1;
           for (let r = 5; r >= 0; r--) {
             if (this.gameState.board[r][col] === null) {
@@ -345,18 +397,45 @@ export class RoomDurableObject {
               break;
             }
           }
-          
           if (row !== -1) {
             this.gameState.board[row][col] = playerColor;
             this.checkConnectFourWin(row, col, playerColor);
-            
             if (!this.gameState.winner && !this.gameState.isDraw) {
               this.gameState.turn = this.gameState.players.find((id: string) => id !== playerId);
             } else {
-              this.status = 'FINISHED';
+              this.status = 'RESULTS';
             }
             this.broadcastState();
           }
+        }
+      }
+    } else if (this.settings?.gameId === 'chess') {
+      if (action.type === 'MOVE') {
+        const isWhiteTurn = this.gameState.turn === this.gameState.whiteId;
+        if ((isWhiteTurn && playerId !== this.gameState.whiteId) || (!isWhiteTurn && playerId !== this.gameState.blackId)) {
+          return; // Not their turn
+        }
+        
+        try {
+          const chess = new Chess(this.gameState.fen);
+          const move = chess.move(action.move);
+          if (move) {
+            this.gameState.fen = chess.fen();
+            this.gameState.history.push(move.san);
+            
+            if (chess.isCheckmate()) {
+              this.gameState.winner = playerId;
+              this.status = 'RESULTS';
+            } else if (chess.isDraw() || chess.isStalemate() || chess.isThreefoldRepetition() || chess.isInsufficientMaterial()) {
+              this.gameState.isDraw = true;
+              this.status = 'RESULTS';
+            } else {
+              this.gameState.turn = isWhiteTurn ? this.gameState.blackId : this.gameState.whiteId;
+            }
+            this.broadcastState();
+          }
+        } catch (e) {
+          // Invalid move
         }
       }
     } else if (this.settings?.gameId === 'snake-arena') {
@@ -364,33 +443,63 @@ export class RoomDurableObject {
         const snake = this.gameState.snakes.find((s: any) => s.id === playerId);
         if (snake && !snake.isDead) {
           const { x, y } = action.dir;
-          // Prevent 180 turns
           if (snake.dir.x !== -x || snake.dir.y !== -y) {
             snake.nextDir = { x, y };
           }
         }
       }
-    } else if (this.settings?.gameId === 'word-guesser') {
-      if (action.type === 'GUESS') {
-        if (this.gameState.phase === 'picking') {
-          if (playerId === this.gameState.turn) {
-            this.gameState.word = action.word.toUpperCase();
-            this.gameState.phase = 'guessing';
-            this.broadcastState();
-          }
-        } else if (this.gameState.phase === 'guessing') {
-          const isCorrect = action.word.toUpperCase() === this.gameState.word;
-          this.gameState.guesses.push({ playerId, text: action.word, isCorrect });
-          if (isCorrect) {
-            this.gameState.scores[playerId] += 10;
-            this.gameState.phase = 'round-end';
-            this.gameState.winner = playerId;
-            this.status = 'FINISHED';
-          }
-          this.broadcastState();
-        }
+    }
+  }
+
+  private tickProgressBroadcast() {
+    if (this.status !== 'PLAYING' && this.status !== 'FINISHING') return;
+
+    const activePlayers = Array.from(this.players.values()).filter(p => !p.isSpectator);
+    // Sort players by progress or score to compute ranks
+    const sorted = [...activePlayers].sort((a, b) => b.progress - a.progress);
+    sorted.forEach((p, index) => {
+      p.rank = index + 1;
+    });
+
+    const clientPlayers = activePlayers.map(p => ({
+      id: p.id,
+      progress: p.progress,
+      liveMetricValue: p.liveMetricValue,
+      rank: p.rank,
+      finished: p.finished
+    }));
+
+    const msg = JSON.stringify({
+      type: 'MATCH_PROGRESS_UPDATE',
+      leaderboard: clientPlayers
+    });
+
+    for (const p of this.players.values()) {
+      if (p.ws && p.ws.readyState === WebSocket.READY_STATE_OPEN) {
+        try { p.ws.send(msg); } catch (e) {}
       }
     }
+  }
+
+  private checkMatchEnd() {
+    const activePlayers = Array.from(this.players.values()).filter(p => !p.isSpectator);
+    const allFinished = activePlayers.every(p => p.finished);
+    if (allFinished) {
+      this.endMatch();
+    } else if (this.status === 'PLAYING') {
+      this.status = 'FINISHING';
+      this.broadcastState();
+    }
+  }
+
+  private endMatch() {
+    this.status = 'RESULTS';
+    if (this.progressTickTimer) {
+      clearInterval(this.progressTickTimer);
+      this.progressTickTimer = null;
+    }
+    this.tickProgressBroadcast(); // Final flush
+    this.broadcastState();
   }
 
   private tickSnakeArena() {
@@ -410,32 +519,23 @@ export class RoomDurableObject {
       head.x += snake.dir.x;
       head.y += snake.dir.y;
 
-      // Wall collision
       if (head.x < 0 || head.x >= gridSize.w || head.y < 0 || head.y >= gridSize.h) {
-        snake.isDead = true;
-        continue;
+        snake.isDead = true; continue;
       }
 
-      // Self or other snake collision
       let hit = false;
       for (const other of snakes) {
         if (other.isDead) continue;
         for (const segment of other.body) {
           if (segment.x === head.x && segment.y === head.y) {
-            hit = true;
-            break;
+            hit = true; break;
           }
         }
         if (hit) break;
       }
-      if (hit) {
-        snake.isDead = true;
-        continue;
-      }
+      if (hit) { snake.isDead = true; continue; }
 
       snake.body.unshift(head);
-
-      // Food collision
       if (head.x === food.x && head.y === food.y) {
         snake.score += 10;
         food.x = Math.floor(Math.random() * gridSize.w);
@@ -446,18 +546,12 @@ export class RoomDurableObject {
     }
 
     if (snakes.length > 1 && aliveSnakes <= 1) {
-      this.status = 'FINISHED';
+      this.status = 'RESULTS';
       this.gameState.winner = lastAlive ? lastAlive.id : null;
-      if (this.gameTickTimer) {
-        clearInterval(this.gameTickTimer);
-        this.gameTickTimer = null;
-      }
+      if (this.gameTickTimer) { clearInterval(this.gameTickTimer); this.gameTickTimer = null; }
     } else if (snakes.length === 1 && aliveSnakes === 0) {
-      this.status = 'FINISHED';
-      if (this.gameTickTimer) {
-        clearInterval(this.gameTickTimer);
-        this.gameTickTimer = null;
-      }
+      this.status = 'RESULTS';
+      if (this.gameTickTimer) { clearInterval(this.gameTickTimer); this.gameTickTimer = null; }
     }
 
     this.broadcastState();
@@ -496,7 +590,6 @@ export class RoomDurableObject {
     if (check(0, 1) || check(1, 0) || check(1, 1) || check(1, -1)) {
       this.gameState.winner = this.gameState.players[color === 'RED' ? 0 : 1];
     } else {
-      // Check draw
       let isDraw = true;
       for (let c = 0; c < 7; c++) {
         if (b[0][c] === null) isDraw = false;
@@ -512,27 +605,25 @@ export class RoomDurableObject {
     this.players.delete(playerId);
 
     if (this.players.size === 0) {
-      // Room empty, clean up
       this.updateLiveIndex(true);
       return;
     }
 
     if (player.isHost) {
-      // Host migration
       const nextHost = Array.from(this.players.values())[0];
-      if (nextHost) {
-        nextHost.isHost = true;
-      }
+      if (nextHost) nextHost.isHost = true;
     }
 
-    // If game was playing and active player left, handle forfeit or pause
-    if (this.status === 'PLAYING' && !player.isSpectator) {
+    if ((this.status === 'PLAYING' || this.status === 'FINISHING') && !player.isSpectator) {
       if (this.settings?.gameId === 'snake-arena') {
         const snake = this.gameState?.snakes?.find((s: any) => s.id === playerId);
         if (snake) snake.isDead = true;
+      } else if (this.settings?.gameId === 'typing-test') {
+        player.finished = true;
+        this.checkMatchEnd();
       } else {
-        this.status = 'FINISHED';
-        if (this.gameState) {
+        this.status = 'RESULTS';
+        if (this.gameState && this.gameState.players) {
           const remainingPlayer = this.gameState.players.find((id: string) => id !== playerId);
           this.gameState.winner = remainingPlayer;
         }
@@ -553,7 +644,11 @@ export class RoomDurableObject {
       name: p.name,
       isReady: p.isReady,
       isHost: p.isHost,
-      isSpectator: p.isSpectator
+      isSpectator: p.isSpectator,
+      progress: p.progress,
+      liveMetricValue: p.liveMetricValue,
+      rank: p.rank,
+      finished: p.finished
     }));
 
     const statePayload = {
@@ -571,11 +666,7 @@ export class RoomDurableObject {
     const msg = JSON.stringify(statePayload);
     for (const p of this.players.values()) {
       if (p.ws && p.ws.readyState === WebSocket.READY_STATE_OPEN) {
-        try {
-          p.ws.send(msg);
-        } catch (e) {
-          // Stale socket
-        }
+        try { p.ws.send(msg); } catch (e) {}
       }
     }
   }
@@ -603,13 +694,12 @@ export class RoomDurableObject {
         mode: this.settings?.mode,
         currentPlayers: activePlayers,
         maxPlayers: this.settings?.maxPlayers,
-        joinable: this.status === 'LOBBY' && activePlayers < (this.settings?.maxPlayers || 2),
+        joinable: this.status === 'WAITING' && activePlayers < (this.settings?.maxPlayers || 2),
         watchable: this.settings?.spectatorsAllowed,
         icon: this.settings?.gameId === 'tic-tac-toe' ? '❌' : '🔴'
       }
     };
 
-    // Fire and forget
     liveIndex.fetch('http://internal/api/live/update', {
       method: 'POST',
       body: JSON.stringify(payload)

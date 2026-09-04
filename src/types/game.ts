@@ -45,6 +45,38 @@ export interface GameSettingDefinition {
   step?: number;
 }
 
+export interface MatchProfile {
+  progressMetric: string;
+  liveMetric: string;
+  finishCondition: string;
+  resultShape: 'ranked' | 'headToHead';
+}
+
+export interface MatchParticipant {
+  playerId: string;
+  displayName: string;
+  avatarId?: string;
+  status: 'waiting' | 'active' | 'finished' | 'disconnected';
+  progress: number;
+  liveMetricValue: number;
+  rank?: number;
+}
+
+export interface MatchState {
+  status: 'WAITING' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISHING' | 'RESULTS' | 'CLOSED';
+  startedAt?: number;
+  endedAt?: number;
+  participants: MatchParticipant[];
+  leaderboard: MatchParticipant[];
+}
+
+export interface MatchResultData {
+  playerId: string;
+  score: number;
+  rank: number;
+  metrics: Record<string, number>;
+}
+
 export interface GameMetadata {
   id: string;
   slug: string;
@@ -61,6 +93,7 @@ export interface GameMetadata {
   controls: GameControls;
   room?: RoomConfig;
   settingsSchema?: GameSettingDefinition[];
+  matchProfile?: MatchProfile;
   tags: string[];
   color: string; // Accent color for the game
   icon: string;  // Emoji icon
@@ -98,8 +131,10 @@ export interface GameComponentProps {
   onResume: () => void;
   isPaused: boolean;
   multiplayerState?: any;
-  multiplayerRole?: 'player1' | 'player2' | 'spectator';
+  multiplayerRole?: 'player1' | 'player2' | 'spectator' | string;
   onMultiplayerAction?: (action: any) => void;
+  onMatchProgress?: (progress: number, liveMetricValue: number) => void;
+  onMatchFinished?: (progress: number, liveMetricValue: number) => void;
 }
 
 // ============================================================

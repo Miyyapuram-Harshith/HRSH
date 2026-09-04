@@ -27,7 +27,7 @@ export default function RoomLobby() {
 
   // Apply initial settings if they were passed via navigation state (new room)
   useEffect(() => {
-    if (room.isConnected && room.status === 'LOBBY' && location.state?.initialSettings) {
+    if (room.isConnected && room.status === 'WAITING' && location.state?.initialSettings) {
       const me = room.players.find(p => p.id === player?.id);
       if (me?.isHost) {
         RoomEngine.updateSettings(location.state.initialSettings);
@@ -100,7 +100,7 @@ export default function RoomLobby() {
   }
 
   // Active game states
-  if (room.status === 'COUNTDOWN' || room.status === 'PLAYING' || room.status === 'FINISHED') {
+  if (room.status === 'COUNTDOWN' || room.status === 'PLAYING' || room.status === 'FINISHING' || room.status === 'RESULTS') {
     return (
       <div className="w-full max-w-5xl mx-auto">
         {room.status === 'COUNTDOWN' && (
@@ -111,7 +111,7 @@ export default function RoomLobby() {
           </div>
         )}
         
-        {room.status === 'FINISHED' && isHost && (
+        {room.status === 'RESULTS' && isHost && (
           <div className="absolute top-20 right-4 z-40 bg-surface-raised border border-border-default p-4 rounded-xl shadow-xl flex flex-col gap-2">
             <div className="text-sm font-semibold mb-2">Host Options</div>
             <button onClick={() => RoomEngine.rematch()} className="px-4 py-2 bg-hrsh-accent text-white rounded-lg text-sm">Rematch in Lobby</button>
@@ -125,7 +125,7 @@ export default function RoomLobby() {
               <span className="text-xl">{game.icon}</span>
               <div className="font-semibold">{game.title}</div>
             </div>
-            {room.status === 'FINISHED' && (
+            {room.status === 'RESULTS' && (
               <div className="px-3 py-1 bg-hrsh-accent text-white text-xs font-bold rounded-lg uppercase tracking-wider">Match Finished</div>
             )}
             <button onClick={() => navigate('/multiplayer')} className="p-2 hover:bg-surface-hover rounded-lg transition-colors text-text-muted hover:text-status-danger" title="Leave Match">
@@ -147,6 +147,8 @@ export default function RoomLobby() {
                   multiplayerState={room.gameState}
                   multiplayerRole={me?.isSpectator ? 'spectator' : (room.gameState?.players.indexOf(me?.id) === 0 ? 'player1' : 'player2')}
                   onMultiplayerAction={(action: any) => RoomEngine.sendGameAction(action)}
+                  onMatchProgress={(progress, liveValue) => RoomEngine.sendMatchProgress(progress, liveValue)}
+                  onMatchFinished={(progress, liveValue) => RoomEngine.sendMatchFinished(progress, liveValue)}
                 />
               </Suspense>
             )}
@@ -156,7 +158,7 @@ export default function RoomLobby() {
     );
   }
 
-  // LOBBY STATE
+  // WAITING STATE
   const activePlayers = room.players.filter(p => !p.isSpectator);
   const spectators = room.players.filter(p => p.isSpectator);
 

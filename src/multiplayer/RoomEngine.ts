@@ -171,6 +171,14 @@ export class RoomEngine {
     this.send({ type: 'GAME_ACTION', action });
   }
 
+  static sendMatchProgress(progress: number, liveMetricValue: number) {
+    this.send({ type: 'MATCH_PROGRESS', payload: { progress, liveMetricValue } });
+  }
+
+  static sendMatchFinished(progress: number, liveMetricValue: number) {
+    this.send({ type: 'MATCH_FINISHED', payload: { progress, liveMetricValue } });
+  }
+
   static rematch() {
     this.send({ type: 'REMATCH' });
   }
