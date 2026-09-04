@@ -7,6 +7,7 @@
 
 import { GameRegistry } from '../engine/GameRegistry';
 import type { GameMetadata } from '../types/game';
+import { GAME_SCHEMAS } from './gameSchemas';
 
 const games: GameMetadata[] = [
   // ---- SOLO ----
@@ -147,6 +148,7 @@ const games: GameMetadata[] = [
     tags: ['strategy', 'classic', 'quick'],
     color: '#ec4899',
     icon: '❌',
+    settingsSchema: GAME_SCHEMAS['tic-tac-toe'],
     room: { visibility: ['private', 'public'], spectators: true, autoStart: false, countdown: [3, 5], rematch: true },
     component: () => import('../games/tictactoe/TicTacToeGame'),
   },
@@ -169,6 +171,7 @@ const games: GameMetadata[] = [
     tags: ['strategy', 'classic'],
     color: '#f97316',
     icon: '🔴',
+    settingsSchema: GAME_SCHEMAS['connect-four'],
     room: { visibility: ['private', 'public'], spectators: true, autoStart: false, countdown: [3, 5], rematch: true },
     component: () => import('../games/connectfour/ConnectFourGame'),
   },
@@ -194,6 +197,7 @@ const games: GameMetadata[] = [
     tags: ['multiplayer', 'action', 'competitive', 'survival', 'party'],
     color: '#10b981',
     icon: '🐍',
+    settingsSchema: GAME_SCHEMAS['snake-arena'],
     room: { visibility: ['private', 'public'], spectators: true, autoStart: true, countdown: [3, 5, 10], rematch: true },
     component: () => import('../games/snake-arena/SnakeArenaGame'),
   },
@@ -215,6 +219,7 @@ const games: GameMetadata[] = [
     tags: ['words', 'casual', 'party'],
     color: '#eab308',
     icon: '💬',
+    settingsSchema: GAME_SCHEMAS['word-guesser'],
     component: () => import('../games/word-guesser/WordGuesserGame'),
   },
 

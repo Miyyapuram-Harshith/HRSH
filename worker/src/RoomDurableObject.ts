@@ -1,6 +1,7 @@
 import { Env } from './index';
+import { GAME_SCHEMAS } from '../../src/data/gameSchemas';
 
-interface RoomSettings {
+export interface RoomSettings {
   gameId: string;
   mode: string;
   maxPlayers: number;
@@ -10,6 +11,7 @@ interface RoomSettings {
   autoStartWhenFull: boolean;
   countdownSeconds: number;
   rematchSameRoom: boolean;
+  gameSettings?: Record<string, any>;
 }
 
 interface Player {
@@ -31,6 +33,7 @@ export class RoomDurableObject {
   private settings: RoomSettings | null = null;
   private status: RoomStatus = 'LOBBY';
   private roomId: string;
+  private isCreated: boolean = false;
   private gameState: any = null; // Authoritative game state
   private countdownTimer: any = null;
   private countdownValue: number = 0;
@@ -46,12 +49,22 @@ export class RoomDurableObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     
-    // Extract roomId from URL path (e.g. /api/room/X7K9Q)
+    // Extract roomId from URL path (e.g. /api/room/X7K9Q or /api/init/X7K9Q)
     const segments = url.pathname.split('/');
     this.roomId = segments[3];
 
+    // Explicit room initialization
+    if (url.pathname.startsWith('/api/init/') && request.method === 'POST') {
+      this.isCreated = true;
+      return new Response('OK');
+    }
+
     // Handle WebSocket upgrade
     if (request.headers.get('Upgrade') === 'websocket') {
+      if (!this.isCreated) {
+        return new Response('Room Not Found', { status: 404 });
+      }
+
       const [client, server] = Object.values(new WebSocketPair());
       
       const playerId = url.searchParams.get('playerId') || 'unknown';
@@ -82,8 +95,16 @@ export class RoomDurableObject {
         spectatorsAllowed: true,
         autoStartWhenFull: false,
         countdownSeconds: 3,
-        rematchSameRoom: true
+        rematchSameRoom: true,
+        gameSettings: {}
       };
+      
+      const schema = GAME_SCHEMAS['tic-tac-toe'];
+      if (schema) {
+        schema.forEach(s => {
+          this.settings!.gameSettings![s.key] = s.defaultValue;
+        });
+      }
     }
 
     const isFull = Array.from(this.players.values()).filter(p => !p.isSpectator).length >= this.settings.maxPlayers;
@@ -123,7 +144,31 @@ export class RoomDurableObject {
     switch (msg.type) {
       case 'ROOM_SETTINGS_UPDATE':
         if (player.isHost && this.status === 'LOBBY') {
-          this.settings = { ...this.settings, ...msg.settings } as RoomSettings;
+          const newSettings = { ...this.settings, ...msg.settings } as RoomSettings;
+          
+          // Validate gameSettings against schema
+          if (newSettings.gameSettings && newSettings.gameId) {
+            const schema = GAME_SCHEMAS[newSettings.gameId];
+            if (schema) {
+              const validatedGameSettings: Record<string, any> = {};
+              for (const s of schema) {
+                const val = newSettings.gameSettings[s.key];
+                if (val !== undefined) {
+                  // Basic validation: ensure number if it's a number/slider type
+                  if (s.type === 'slider' || s.type === 'number') {
+                    validatedGameSettings[s.key] = Number(val) || s.defaultValue;
+                  } else {
+                    validatedGameSettings[s.key] = val;
+                  }
+                } else {
+                  validatedGameSettings[s.key] = s.defaultValue;
+                }
+              }
+              newSettings.gameSettings = validatedGameSettings;
+            }
+          }
+
+          this.settings = newSettings;
           this.broadcastState();
           this.updateLiveIndex();
         }

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GameRegistry } from '../../engine/GameRegistry';
+import type { GameSettingDefinition } from '../../types/game';
 
 interface RoomSettingsPanelProps {
   mode: 'create' | 'edit';
@@ -19,8 +20,20 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
   const [roomName, setRoomName] = useState(initialSettings?.roomName || '');
   const [spectatorsAllowed, setSpectatorsAllowed] = useState(initialSettings?.spectatorsAllowed ?? true);
   const [autoStart, setAutoStart] = useState(initialSettings?.autoStartWhenFull ?? false);
+  const [gameSettings, setGameSettings] = useState<Record<string, any>>(initialSettings?.gameSettings || {});
 
   const selectedGame = GameRegistry.get(gameId);
+
+  // Initialize game settings if missing when game changes
+  useEffect(() => {
+    if (selectedGame && !initialSettings?.gameSettings) {
+      const defaultSettings: Record<string, any> = {};
+      selectedGame.settingsSchema?.forEach(schema => {
+        defaultSettings[schema.key] = schema.defaultValue;
+      });
+      setGameSettings(prev => Object.keys(prev).length === 0 ? defaultSettings : prev);
+    }
+  }, [selectedGame, initialSettings]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +46,56 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
       spectatorsAllowed,
       autoStartWhenFull: autoStart,
       countdownSeconds: 3,
-      rematchSameRoom: true
+      rematchSameRoom: true,
+      gameSettings
     });
+  };
+
+  const renderGameSetting = (schema: GameSettingDefinition) => {
+    const value = gameSettings[schema.key] ?? schema.defaultValue;
+    const handleChange = (newVal: any) => {
+      setGameSettings(prev => ({ ...prev, [schema.key]: newVal }));
+    };
+
+    switch (schema.type) {
+      case 'select':
+        return (
+          <div key={schema.key}>
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">{schema.label}</label>
+            <select
+              value={value}
+              onChange={(e) => {
+                const opt = schema.options?.find(o => String(o.value) === String(e.target.value));
+                if (opt) handleChange(opt.value);
+                else handleChange(e.target.value);
+              }}
+              className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-hrsh-accent"
+            >
+              {schema.options?.map(opt => (
+                <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        );
+      case 'slider':
+        return (
+          <div key={schema.key}>
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">{schema.label}</label>
+            <input
+              type="range"
+              min={schema.min}
+              max={schema.max}
+              step={schema.step}
+              value={Number(value)}
+              onChange={(e) => handleChange(Number(e.target.value))}
+              className="w-full accent-hrsh-accent"
+            />
+            <div className="text-center text-sm font-medium mt-1">{value}</div>
+          </div>
+        );
+      default:
+        return null;
+    }
   };
 
   if (!selectedGame) return null;
@@ -53,6 +114,11 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
                 if (g) {
                   setMaxPlayers(g.maxPlayers || 2);
                   setGameMode(g.modes[0]?.id || 'classic');
+                  const defaultSettings: Record<string, any> = {};
+                  g.settingsSchema?.forEach(schema => {
+                    defaultSettings[schema.key] = schema.defaultValue;
+                  });
+                  setGameSettings(defaultSettings);
                 }
               }}
               className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-hrsh-accent"
@@ -142,6 +208,14 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
               maxLength={32}
               className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-hrsh-accent"
             />
+          </div>
+        )}
+
+        {/* Dynamic Game Settings */}
+        {selectedGame.settingsSchema && selectedGame.settingsSchema.length > 0 && (
+          <div className="border-t border-border-default pt-4 space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-text-secondary mb-2">Advanced Game Settings</h3>
+            {selectedGame.settingsSchema.map(schema => renderGameSetting(schema))}
           </div>
         )}
       </div>

@@ -28,6 +28,23 @@ export interface RoomConfig {
   rematch: boolean;
 }
 
+export interface GameSettingOption {
+  value: string | number | boolean;
+  label: string;
+}
+
+export interface GameSettingDefinition {
+  key: string;
+  type: 'select' | 'slider' | 'toggle' | 'number' | 'color' | 'avatar';
+  label: string;
+  description?: string;
+  defaultValue: any;
+  options?: GameSettingOption[];
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
 export interface GameMetadata {
   id: string;
   slug: string;
@@ -43,6 +60,7 @@ export interface GameMetadata {
   modes: GameMode[];
   controls: GameControls;
   room?: RoomConfig;
+  settingsSchema?: GameSettingDefinition[];
   tags: string[];
   color: string; // Accent color for the game
   icon: string;  // Emoji icon

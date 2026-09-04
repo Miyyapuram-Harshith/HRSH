@@ -18,7 +18,7 @@ export default function RoomLobby() {
 
   useEffect(() => {
     if (roomId && player) {
-      RoomEngine.connect(roomId);
+      RoomEngine.connect(roomId.toUpperCase());
     }
     return () => {
       RoomEngine.disconnect();
@@ -48,21 +48,44 @@ export default function RoomLobby() {
     return game ? lazy(game.component) : null;
   }, [game]);
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
+  const handleCopyLink = async () => {
+    const canonicalUrl = `${window.location.origin}/room/${roomId?.toUpperCase()}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join my HRSH Room',
+          text: `Play ${game?.title || 'a game'} with me on HRSH!`,
+          url: canonicalUrl,
+        });
+        return;
+      } catch (err) {
+        // Fallback to clipboard if user cancels or it fails
+      }
+    }
+    
+    navigator.clipboard.writeText(canonicalUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   if (room.error) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="text-4xl mb-4">🚫</div>
-        <h1 className="text-xl font-bold mb-2">Error</h1>
-        <p className="text-status-danger mb-6">{room.error}</p>
-        <button onClick={() => navigate('/multiplayer')} className="px-6 py-2.5 bg-surface-raised border border-border-default hover:bg-surface-hover rounded-xl text-sm transition-colors">
-          Leave
-        </button>
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+        <div className="text-5xl mb-4">🚪</div>
+        <h1 className="text-2xl font-bold mb-2">Room Unavailable</h1>
+        <p className="text-text-muted mb-8 max-w-md">
+          {room.error === 'Room Not Found' 
+            ? "We couldn't find a room with that code. It may have expired or the code might be incorrect." 
+            : room.error}
+        </p>
+        <div className="flex gap-4">
+          <button onClick={() => navigate('/multiplayer')} className="px-6 py-3 bg-hrsh-accent text-white hover:bg-hrsh-accent-hover rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-hrsh-accent/20">
+            Join Another Room
+          </button>
+          <button onClick={() => navigate('/room/create')} className="px-6 py-3 bg-surface-raised border border-border-default hover:border-border-accent rounded-xl font-semibold text-sm transition-colors">
+            Create Room
+          </button>
+        </div>
       </div>
     );
   }

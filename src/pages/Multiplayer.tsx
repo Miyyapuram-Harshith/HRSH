@@ -12,11 +12,11 @@ export default function Multiplayer() {
       </div>
 
       {/* Entry points */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-3 gap-4">
         <div className="bg-surface-raised border border-border-default rounded-2xl p-6 text-center">
           <div className="text-3xl mb-3">⚡</div>
           <h2 className="text-base font-semibold mb-1">Quick Match</h2>
-          <p className="text-text-muted text-xs mb-4">Jump into a game instantly. We'll find you an opponent.</p>
+          <p className="text-text-muted text-xs mb-4">Jump into a game instantly.</p>
           <button className="px-6 py-2.5 bg-hrsh-accent hover:bg-hrsh-accent-hover text-white rounded-xl font-medium text-sm transition-colors opacity-50 cursor-not-allowed">
             Coming Soon
           </button>
@@ -25,10 +25,39 @@ export default function Multiplayer() {
         <div className="bg-surface-raised border border-border-default rounded-2xl p-6 text-center">
           <div className="text-3xl mb-3">🏠</div>
           <h2 className="text-base font-semibold mb-1">Create Room</h2>
-          <p className="text-text-muted text-xs mb-4">Set up a private or public room for friends.</p>
-          <Link to="/room/create" className="inline-block px-6 py-2.5 bg-surface-overlay hover:bg-surface-hover text-text-primary rounded-xl font-medium text-sm transition-colors">
+          <p className="text-text-muted text-xs mb-4">Set up a private or public room.</p>
+          <Link to="/room/create" className="inline-block px-6 py-2.5 bg-surface-overlay hover:bg-surface-hover text-text-primary rounded-xl font-medium text-sm transition-colors border border-border-default">
             Create Room
           </Link>
+        </div>
+
+        <div className="bg-surface-raised border border-border-default rounded-2xl p-6 text-center flex flex-col justify-between">
+          <div>
+            <div className="text-3xl mb-3">🔑</div>
+            <h2 className="text-base font-semibold mb-1">Join Room</h2>
+            <p className="text-text-muted text-xs mb-4">Enter a 5-character code.</p>
+          </div>
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const input = new FormData(e.currentTarget).get('roomId') as string;
+              if (input && input.trim().length >= 4) {
+                window.location.href = `/room/${input.trim().toUpperCase()}`;
+              }
+            }}
+            className="flex gap-2"
+          >
+            <input 
+              type="text" 
+              name="roomId" 
+              placeholder="Code" 
+              maxLength={5}
+              className="w-full bg-surface-base border border-border-default rounded-xl px-3 py-2 text-sm text-center font-bold uppercase focus:outline-none focus:border-hrsh-accent placeholder:font-normal placeholder:normal-case"
+            />
+            <button type="submit" className="px-4 py-2 bg-surface-overlay hover:bg-surface-hover border border-border-default rounded-xl font-medium text-sm transition-colors">
+              Join
+            </button>
+          </form>
         </div>
       </div>
 

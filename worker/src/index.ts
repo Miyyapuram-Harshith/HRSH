@@ -34,8 +34,16 @@ export default {
 
     // Creating a room (generates a unique ID)
     if (url.pathname === '/api/create-room' && request.method === 'POST') {
-      // Just returning a new room ID to the client
       const newRoomId = generateRoomId();
+      
+      // Explicitly initialize the Durable Object so it marks itself as created
+      const doId = env.ROOM.idFromName(newRoomId);
+      const roomDO = env.ROOM.get(doId);
+      
+      const initUrl = new URL(request.url);
+      initUrl.pathname = `/api/init/${newRoomId}`;
+      await roomDO.fetch(new Request(initUrl.toString(), { method: 'POST' }));
+
       return new Response(JSON.stringify({ roomId: newRoomId }), {
         headers: {
           'Content-Type': 'application/json',
