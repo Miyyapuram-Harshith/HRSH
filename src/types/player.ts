@@ -74,3 +74,50 @@ export interface RecentGame {
   lastPlayedAt: number;
   playCount: number;
 }
+
+// Beast Mode additions:
+
+export type LeagueTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond' | 'HRSH Elite';
+
+export interface LeagueProgress {
+  playerId: string;
+  weekId: string; // e.g., '2023-W42'
+  tier: LeagueTier;
+  xp: number;
+  rank: number; // local rank snapshot
+  lastUpdated: number;
+}
+
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  type: 'daily' | 'weekly';
+  target: number;
+  xpReward: number;
+  expiresAt: number;
+  condition: {
+    eventType: string;
+    gameId?: string;
+  };
+}
+
+export interface QuestProgress {
+  id?: number;
+  playerId: string;
+  questId: string;
+  progress: number;
+  completed: boolean;
+  claimed: boolean;
+  lastUpdated: number;
+}
+
+export interface RivalSnapshot {
+  playerId: string;
+  rivalId: string;
+  rivalName: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  updatedAt: number;
+}

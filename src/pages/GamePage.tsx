@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, lazy, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { GameRegistry } from '../engine/GameRegistry';
 import { ScoreEngine } from '../engine/ScoreEngine';

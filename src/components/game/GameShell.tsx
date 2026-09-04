@@ -4,6 +4,8 @@ import { useGameStore } from '../../stores/gameStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { ScoreEngine } from '../../engine/ScoreEngine';
 import { AchievementEngine } from '../../engine/AchievementEngine';
+import { LeagueEngine } from '../../engine/LeagueEngine';
+import { QuestEngine } from '../../engine/QuestEngine';
 import { AnalyticsEngine } from '../../engine/AnalyticsEngine';
 import { ResultScreen } from './ResultScreen';
 import type { GameMetadata, GameResult } from '../../types/game';
@@ -77,12 +79,16 @@ export function GameShell({ game, onQuit, children }: GameShellProps) {
     await updateStreak();
 
     // Check achievements
-    const unlocked = await AchievementEngine.processEvent(player.id, {
+    const eventParams = {
       type: result.won ? 'GAME_WON' : 'GAME_FINISHED',
       gameId: game.id,
       timestamp: Date.now(),
       data: { score: result.score, duration: result.duration, won: result.won },
-    });
+    } as const;
+
+    const unlocked = await AchievementEngine.processEvent(player.id, eventParams);
+    await LeagueEngine.processEvent(player.id, eventParams);
+    await QuestEngine.processEvent(player.id, eventParams);
 
     for (const achievement of unlocked) {
       addAchievement(achievement);

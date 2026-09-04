@@ -1,9 +1,9 @@
 import { lazy } from 'react';
-import type { Game } from '../types/game';
+import type { GameMetadata } from '../types/game';
 
 const componentCache = new Map<string, any>();
 
-export function getGameComponent(game: Game) {
+export function getGameComponent(game: GameMetadata) {
   if (!componentCache.has(game.id)) {
     componentCache.set(game.id, lazy(game.component));
   }

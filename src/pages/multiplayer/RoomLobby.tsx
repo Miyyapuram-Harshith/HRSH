@@ -1,11 +1,12 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, useMemo, Suspense } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../../stores/roomStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { RoomEngine } from '../../multiplayer/RoomEngine';
-import { GameRegistry } from '../../data/games';
+import { GameRegistry } from '../../engine/GameRegistry';
 import { getGameComponent } from '../../utils/gameCache';
 import { RoomSettingsPanel } from '../../components/multiplayer/RoomSettingsPanel';
+import { PlayerCard } from '../../components/ui/PlayerCard';
 
 export default function RoomLobby() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -146,8 +147,8 @@ export default function RoomLobby() {
                   multiplayerState={room.gameState}
                   multiplayerRole={me?.isSpectator ? 'spectator' : (room.gameState?.players.indexOf(me?.id) === 0 ? 'player1' : 'player2')}
                   onMultiplayerAction={(action: any) => RoomEngine.sendGameAction(action)}
-                  onMatchProgress={(progress, liveValue) => RoomEngine.sendMatchProgress(progress, liveValue)}
-                  onMatchFinished={(progress, liveValue) => RoomEngine.sendMatchFinished(progress, liveValue)}
+                  onMatchProgress={(progress: number, liveValue: number) => RoomEngine.sendMatchProgress(progress, liveValue)}
+                  onMatchFinished={(progress: number, liveValue: number) => RoomEngine.sendMatchFinished(progress, liveValue)}
                 />
               </Suspense>
             )}
@@ -231,9 +232,11 @@ export default function RoomLobby() {
                 {activePlayers.map((p) => (
                   <div key={p.id} className="p-4 flex items-center justify-between hover:bg-surface-overlay transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-surface-base border border-border-default flex items-center justify-center font-bold text-lg">
-                        {p.name?.[0]?.toUpperCase()}
-                      </div>
+                      <PlayerCard playerId={p.id} playerName={p.name}>
+                        <div className="w-10 h-10 rounded-full bg-surface-base border border-border-default flex items-center justify-center font-bold text-lg cursor-pointer transition-hrsh hover-lift">
+                          {p.name?.[0]?.toUpperCase()}
+                        </div>
+                      </PlayerCard>
                       <div>
                         <div className="font-medium flex items-center gap-2">
                           {p.name}
