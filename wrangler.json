@@ -34,11 +34,6 @@
 		{
 			"binding": "DB",
 			"database_name": "hrsh-db",
-			"database_id": "placeholder-id-replace-me"
-		},
-		{
-			"binding": "hrsh_db",
-			"database_name": "hrsh-db",
 			"database_id": "8dc9bcf3-64d8-4640-91d3-939b21089b5d"
 		}
 	]
