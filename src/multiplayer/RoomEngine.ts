@@ -89,8 +89,8 @@ export class RoomEngine {
         } else if (msg.type === 'ERROR') {
           useRoomStore.getState().updateState({ connectionState: 'ERROR', error: msg.message });
           if (msg.code === 'ROOM_NOT_FOUND' || msg.code === 'ROOM_FULL' || msg.code === 'ROOM_CLOSED') {
-             // Do not reconnect for these explicit rejections
-             this.disconnect();
+             // Do not reconnect for these explicit rejections, preserve ERROR state
+             this.disconnect(true);
           }
         } else if (msg.type === 'KICKED') {
           useRoomStore.getState().setError('You have been kicked from the room.');

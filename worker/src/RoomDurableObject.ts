@@ -52,6 +52,12 @@ export class RoomDurableObject {
     this.state = state;
     this.env = env;
     this.roomId = 'unknown'; 
+    
+    this.state.blockConcurrencyWhile(async () => {
+      this.isCreated = (await this.state.storage.get('isCreated')) || false;
+      const savedSettings = await this.state.storage.get<RoomSettings>('settings');
+      if (savedSettings) this.settings = savedSettings;
+    });
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -61,54 +67,66 @@ export class RoomDurableObject {
 
     if (url.pathname.startsWith('/api/init/') && request.method === 'POST') {
       this.isCreated = true;
+      await this.state.storage.put('isCreated', true);
       return new Response('OK');
     }
 
     if (request.headers.get('Upgrade') === 'websocket') {
-      if (!this.isCreated) {
-        return new Response('Room Not Found', { status: 404 });
-      }
-
       const [client, server] = Object.values(new WebSocketPair());
       const playerId = url.searchParams.get('playerId') || 'unknown';
       const playerName = url.searchParams.get('playerName') || 'Anonymous';
       
-      await this.handleWebSocket(server, playerId, playerName);
+      this.state.acceptWebSocket(server, [playerId]);
+      server.serializeAttachment({ playerId, playerName });
+      
+      if (!this.isCreated) {
+        server.send(JSON.stringify({ type: 'ERROR', code: 'ROOM_NOT_FOUND', message: 'Room not found.' }));
+        server.close(4004, 'Room Not Found');
+        return new Response(null, { status: 101, webSocket: client });
+      }
+
       return new Response(null, { status: 101, webSocket: client });
     }
 
     return new Response('Expected WebSocket', { status: 400 });
   }
 
-  private async handleWebSocket(ws: WebSocket, playerId: string, playerName: string) {
-    this.state.acceptWebSocket(ws);
-
-    // Instead of joining immediately, we wait for ROOM_JOIN message
-    // We bind a temporary listener
-    ws.addEventListener('message', async (event) => {
-      try {
-        const msg = JSON.parse(event.data as string);
-        if (msg.type === 'ROOM_JOIN') {
-          await this.handleRoomJoin(ws, msg);
-        } else if (msg.type === 'PING') {
-          ws.send(JSON.stringify({ type: 'PONG' }));
-        } else {
-          // If already joined, process normally. 
-          // We extract playerId from the connected player if possible, or use the one from URL fallback.
-          await this.handleMessage(msg.playerId || playerId, msg);
-        }
-      } catch (err) {
-        console.error('Invalid message format', err);
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
+    try {
+      const msg = JSON.parse(message as string);
+      const attachment = ws.deserializeAttachment();
+      const playerId = msg.playerId || attachment?.playerId || 'unknown';
+      
+      if (msg.type === 'ROOM_JOIN') {
+        await this.handleRoomJoin(ws, msg, attachment);
+      } else if (msg.type === 'PING') {
+        ws.send(JSON.stringify({ type: 'PONG' }));
+      } else {
+        await this.handleMessage(playerId, msg);
       }
-    });
-
-    ws.addEventListener('close', () => {
-      this.handleDisconnect(playerId);
-    });
+    } catch (err) {
+      console.error('Invalid message format', err);
+    }
   }
 
-  private async handleRoomJoin(ws: WebSocket, msg: any) {
-    const { playerId, playerName, initialSettings } = msg;
+  async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
+    const attachment = ws.deserializeAttachment();
+    if (attachment?.playerId) {
+      this.handleDisconnect(attachment.playerId);
+    }
+  }
+
+  async webSocketError(ws: WebSocket, error: unknown) {
+    const attachment = ws.deserializeAttachment();
+    if (attachment?.playerId) {
+      this.handleDisconnect(attachment.playerId);
+    }
+  }
+
+  private async handleRoomJoin(ws: WebSocket, msg: any, attachment: any) {
+    const playerId = msg.playerId || attachment?.playerId;
+    const playerName = msg.playerName || attachment?.playerName;
+    const initialSettings = msg.initialSettings;
     
     if (this.status === 'CLOSED') {
       ws.send(JSON.stringify({ type: 'ERROR', code: 'ROOM_CLOSED', message: 'This room is closed.' }));
@@ -156,6 +174,8 @@ export class RoomDurableObject {
           });
         }
       }
+      
+      this.state.storage.put('settings', this.settings);
     }
 
     const activePlayersCount = Array.from(this.players.values()).filter(p => !p.isSpectator).length;
@@ -217,6 +237,7 @@ export class RoomDurableObject {
           }
 
           this.settings = newSettings;
+          this.state.storage.put('settings', this.settings);
           this.broadcastState();
           this.updateLiveIndex();
         }
