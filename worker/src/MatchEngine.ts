@@ -61,10 +61,40 @@ export class MatchEngine {
         winner: null
       };
     } else if (gameId === 'typing-test') {
+      const difficulty = settings?.gameSettings?.difficulty || 'normal';
+      const duration = settings?.gameSettings?.duration || 60;
+      
+      const words = [
+        'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'it', 'for', 'not', 'on', 'with',
+        'he', 'as', 'you', 'do', 'at', 'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her',
+        'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what', 'so', 'up',
+        'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me', 'when', 'make', 'can', 'like', 'time',
+        'no', 'just', 'him', 'know', 'take', 'people', 'into', 'year', 'your', 'good', 'some', 'could',
+        'them', 'see', 'other', 'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think',
+        'also', 'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even',
+        'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'find', 'here', 'thing',
+        'many', 'help', 'where', 'world', 'right', 'still', 'through', 'life', 'game', 'play'
+      ];
+      
+      // Calculate word count needed (approx 100 words per minute + buffer)
+      const wordCount = Math.ceil((duration / 60) * 120);
+      const selected = [];
+      for (let i = 0; i < wordCount; i++) {
+        let word = words[Math.floor(Math.random() * words.length)];
+        if (difficulty === 'hard' && Math.random() < 0.2) {
+          // Capitalize randomly
+          if (Math.random() < 0.5) word = word.charAt(0).toUpperCase() + word.slice(1);
+          // Add punctuation
+          const punc = [',', '.', '!', '?'];
+          if (Math.random() < 0.5) word += punc[Math.floor(Math.random() * punc.length)];
+        }
+        selected.push(word);
+      }
+      
       return {
-        challenge: 'This is a sample text for the typing race. We will implement server-side text generation soon.',
-        duration: settings?.gameSettings?.duration || 60,
-        startTime: Date.now()
+        challenge: selected.join(' '),
+        duration: duration,
+        startTime: Date.now() + 3000 // 3 seconds buffer to allow countdowns to sync
       };
     }
     return {};

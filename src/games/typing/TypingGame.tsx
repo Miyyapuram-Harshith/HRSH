@@ -2,10 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { GameComponentProps, GameResult } from '../../types/game';
 import { useRoomStore } from '../../stores/roomStore';
 import { usePlayerStore } from '../../stores/playerStore';
-
-// ============================================================
-// Typing Race Game
-// ============================================================
+import { TypingLeaderboard } from '../../components/game/TypingLeaderboard';
+import { TypingArea } from './TypingArea';
 
 const WORD_LISTS = {
   common: [
@@ -17,16 +15,7 @@ const WORD_LISTS = {
     'them', 'see', 'other', 'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think',
     'also', 'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even',
     'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'find', 'here', 'thing',
-    'many', 'help', 'where', 'world', 'right', 'still', 'through', 'life', 'game', 'play',
-    'point', 'keep', 'move', 'every', 'last', 'long', 'great', 'same', 'another', 'begin',
-    'while', 'number', 'part', 'turn', 'real', 'leave', 'might', 'want', 'home', 'water',
-    'room', 'mother', 'light', 'enough', 'almost', 'question', 'city', 'tree', 'cross',
-    'farm', 'hard', 'start', 'story', 'draw', 'left', 'late', 'run', 'until', 'plant',
-    'cover', 'food', 'sun', 'four', 'between', 'state', 'never', 'next', 'under', 'group',
-    'along', 'open', 'seem', 'together', 'children', 'school', 'watch', 'letter', 'carry',
-    'music', 'stop', 'without', 'walk', 'example', 'paper', 'young', 'often', 'important',
-    'until', 'always', 'those', 'face', 'land', 'head', 'above', 'near', 'girl', 'body',
-    'center', 'father', 'door', 'before', 'large', 'hand', 'high', 'small', 'below',
+    'many', 'help', 'where', 'world', 'right', 'still', 'through', 'life', 'game', 'play'
   ],
 };
 
@@ -52,278 +41,213 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
   
   const [duration, setDuration] = useState(60);
   const [text, setText] = useState('');
-  const [typed, setTyped] = useState('');
   const [timeLeft, setTimeLeft] = useState(60);
-  const [started, setStarted] = useState(false);
-  const [finished, setFinished] = useState(false);
-  const [wpm, setWpm] = useState(0);
-  const [accuracy, setAccuracy] = useState(100);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTime = useRef(0);
-  const totalChars = useRef(0);
-  const correctChars = useRef(0);
   
-  const lastProgressSentTime = useRef(0);
+  // High-level match states
+  const [hasStarted, setHasStarted] = useState(false); 
+  const [hasFinished, setHasFinished] = useState(false);
+  
+  // Local fast UI updates (WPM, Accuracy, Progress)
+  const [localStats, setLocalStats] = useState({ wpm: 0, accuracy: 100, progress: 0 });
+  
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const startGame = useCallback((seconds: number) => {
-    setDuration(seconds);
-    setTimeLeft(seconds);
-    
-    if (isMultiplayer && multiplayerState.challenge) {
-      setText(multiplayerState.challenge);
-      setDuration(multiplayerState.duration || 60);
-      setTimeLeft(multiplayerState.duration || 60);
+  // Initialization
+  useEffect(() => {
+    let targetDuration = 60;
+    if (isMultiplayer && multiplayerState) {
+      targetDuration = multiplayerState.duration || 60;
+      setDuration(targetDuration);
+      setText(multiplayerState.challenge || 'Waiting for text...');
+      
+      // If multiplayer, start automatically when server says it's time
+      if (!hasStarted) {
+        onGameStart();
+        setHasStarted(true);
+      }
     } else {
+      setDuration(60);
       setText(generateText(200));
     }
+  }, [isMultiplayer, multiplayerState, onGameStart, hasStarted]);
+
+  // Main Timer Loop
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    if (hasStarted && !hasFinished && !isPaused) {
+      timerRef.current = setInterval(() => {
+        let remaining = duration;
+        
+        if (isMultiplayer && multiplayerState?.startTime) {
+          // Authoritative sync with server time
+          const elapsed = Math.floor((Date.now() - multiplayerState.startTime) / 1000);
+          remaining = Math.max(0, duration - elapsed);
+        } else {
+          // Solo mode decrement
+          setTimeLeft(prev => {
+            const next = prev - 1;
+            if (next <= 0) handleAutoFinish();
+            return Math.max(0, next);
+          });
+          return;
+        }
+
+        setTimeLeft(remaining);
+        if (remaining <= 0) {
+          handleAutoFinish();
+        }
+      }, 1000);
+    }
     
-    setTyped('');
-    setStarted(false);
-    setFinished(false);
-    setWpm(0);
-    setAccuracy(100);
-    totalChars.current = 0;
-    correctChars.current = 0;
-    lastProgressSentTime.current = 0;
-    if (timerRef.current) clearInterval(timerRef.current);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [hasStarted, hasFinished, isPaused, isMultiplayer, multiplayerState, duration]);
 
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, [isMultiplayer, multiplayerState]);
-
-  const endGame = useCallback(() => {
-    setFinished(true);
-    if (timerRef.current) clearInterval(timerRef.current);
-
-    const elapsed = (Date.now() - startTime.current) / 1000 / 60; // minutes
-    const wordsTyped = correctChars.current / 5; // standard: 5 chars = 1 word
-    const finalWpm = Math.round(wordsTyped / Math.max(elapsed, 0.01));
-    const finalAccuracy = totalChars.current > 0
-      ? Math.round((correctChars.current / totalChars.current) * 100)
-      : 100;
-      
-    const progress = totalChars.current / Math.max(1, text.length);
-
-    setWpm(finalWpm);
-    setAccuracy(finalAccuracy);
-
+  const handleAutoFinish = useCallback(() => {
+    if (hasFinished) return;
+    setHasFinished(true);
+    
+    // We didn't finish the text naturally, time ran out. Send what we have.
     if (isMultiplayer && onMatchFinished) {
-      onMatchFinished(progress, finalWpm);
-    } else {
+      onMatchFinished(localStats.progress, localStats.wpm);
+    } else if (!isMultiplayer) {
       const result: GameResult = {
         gameId: 'typing-test',
         mode: `${duration}s`,
-        score: finalWpm,
-        won: finalWpm >= 30,
-        duration: Date.now() - startTime.current,
-        moves: totalChars.current,
+        score: localStats.wpm,
+        won: localStats.wpm >= 30,
+        duration: duration * 1000,
+        moves: 0, // total chars
         personalBest: false,
-        data: { wpm: finalWpm, accuracy: finalAccuracy, duration },
+        data: { wpm: localStats.wpm, accuracy: localStats.accuracy, duration },
         timestamp: Date.now(),
       };
       onGameEnd(result);
     }
-  }, [duration, onGameEnd, isMultiplayer, onMatchFinished, text.length]);
+  }, [hasFinished, isMultiplayer, onMatchFinished, localStats, duration, onGameEnd]);
 
-  const handleInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (finished || isPaused) return;
+  // Callbacks from TypingArea
+  const handleLocalStatsUpdate = useCallback((wpm: number, accuracy: number, progress: number) => {
+    setLocalStats({ wpm, accuracy, progress });
+    if (!isMultiplayer) onScoreUpdate(wpm);
+  }, [isMultiplayer, onScoreUpdate]);
 
-    const value = e.target.value;
-
-    // Start timer on first character
-    if (!started) {
-      setStarted(true);
-      startTime.current = Date.now();
-      onGameStart();
-
-      timerRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime.current) / 1000);
-        const remaining = Math.max(0, (isMultiplayer ? (multiplayerState.duration || 60) : duration) - elapsed);
-        setTimeLeft(remaining);
-
-        if (remaining <= 0) {
-          endGame();
-        }
-      }, 100);
-    }
-
-    setTyped(value);
-
-    // Calculate stats
-    totalChars.current = value.length;
-    correctChars.current = 0;
-    for (let i = 0; i < value.length; i++) {
-      if (value[i] === text[i]) correctChars.current++;
-    }
-
-    // Live WPM
-    const elapsed = (Date.now() - startTime.current) / 1000 / 60;
-    let liveWpm = 0;
-    if (elapsed > 0.05) {
-      liveWpm = Math.round((correctChars.current / 5) / elapsed);
-      setWpm(liveWpm);
-      onScoreUpdate(liveWpm);
-    }
-
-    const liveAccuracy = totalChars.current > 0
-      ? Math.round((correctChars.current / totalChars.current) * 100)
-      : 100;
-    setAccuracy(liveAccuracy);
-
-    // Throttle progress updates to server
+  const handleProgressThrottled = useCallback((progress: number, wpm: number) => {
     if (isMultiplayer && onMatchProgress) {
-      const now = Date.now();
-      if (now - lastProgressSentTime.current > 200) {
-        const progress = totalChars.current / Math.max(1, text.length);
-        onMatchProgress(progress, liveWpm);
-        lastProgressSentTime.current = now;
-      }
+      onMatchProgress(progress, wpm);
     }
+  }, [isMultiplayer, onMatchProgress]);
 
-    // Auto-end if typed all text
-    if (value.length >= text.length) {
-      endGame();
-    }
-  }, [started, finished, isPaused, text, duration, onGameStart, onScoreUpdate, endGame, isMultiplayer, multiplayerState, onMatchProgress]);
-
-  // Initialize
-  useEffect(() => {
-    if (isMultiplayer && multiplayerState) {
-       startGame(multiplayerState.duration || 60);
-    } else if (!isMultiplayer) {
-       startGame(60);
-    }
-  }, [startGame, isMultiplayer, multiplayerState]);
-
-  // Cleanup
-  useEffect(() => {
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
-
-  // Render text with highlighting
-  const renderText = () => {
-    return text.split('').map((char, i) => {
-      let className = 'text-text-muted';
-      if (i < typed.length) {
-        className = typed[i] === char ? 'text-text-primary' : 'text-red-400 bg-red-400/10';
-      } else if (i === typed.length) {
-        className = 'text-text-primary bg-hrsh-accent/30 rounded-sm';
-      }
-      return (
-        <span key={i} className={className}>
-          {char}
-        </span>
-      );
-    });
-  };
-
-  // Render Multiplayer Leaderboard
-  const renderLeaderboard = () => {
-    if (!isMultiplayer) return null;
+  const handleTypingFinish = useCallback((wpm: number, accuracy: number, elapsedMs: number) => {
+    if (hasFinished) return;
+    setHasFinished(true);
     
-    // Sort players by rank or progress
-    const sortedPlayers = [...roomPlayers]
-      .filter(p => !p.isSpectator)
-      .sort((a, b) => (b.progress || 0) - (a.progress || 0));
+    if (isMultiplayer && onMatchFinished) {
+      onMatchFinished(1, wpm); // 100% progress
+    } else if (!isMultiplayer) {
+      const result: GameResult = {
+        gameId: 'typing-test',
+        mode: `${duration}s`,
+        score: wpm,
+        won: wpm >= 30,
+        duration: elapsedMs,
+        moves: 0,
+        personalBest: false,
+        data: { wpm, accuracy, duration },
+        timestamp: Date.now(),
+      };
+      onGameEnd(result);
+    }
+  }, [hasFinished, isMultiplayer, onMatchFinished, duration, onGameEnd]);
 
-    return (
-      <div className="bg-surface-raised border border-border-default rounded-xl p-4 mt-6 max-w-2xl mx-auto">
-        <h3 className="font-semibold text-sm mb-3 uppercase tracking-wider text-text-muted">Live Leaderboard</h3>
-        <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-          {sortedPlayers.map((p, idx) => {
-            const isMe = p.id === myPlayerId;
-            const progressPct = Math.min(100, Math.max(0, (p.progress || 0) * 100));
-            return (
-              <div key={p.id} className={`flex items-center gap-3 p-2 rounded-lg ${isMe ? 'bg-hrsh-accent/10 border border-hrsh-accent/20' : 'bg-surface-base'}`}>
-                <div className="font-mono text-sm w-6 font-bold text-text-muted">{p.rank || idx + 1}</div>
-                <div className={`flex-1 font-medium ${isMe ? 'text-hrsh-accent' : 'text-text-primary'} truncate`}>
-                  {p.name} {isMe && '(You)'} {p.finished && <span className="ml-2 text-xs text-status-success font-bold">FINISHED</span>}
-                </div>
-                <div className="flex flex-col items-end w-32">
-                  <div className="text-xs font-mono font-semibold">{p.liveMetricValue || 0} WPM</div>
-                  <div className="w-full bg-surface-overlay h-1.5 rounded-full mt-1 overflow-hidden">
-                    <div className="h-full bg-hrsh-accent transition-all duration-300" style={{ width: `${progressPct}%` }} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+  const handleFirstKeydownSolo = useCallback(() => {
+    if (!isMultiplayer && !hasStarted) {
+      setHasStarted(true);
+      onGameStart();
+    }
+  }, [isMultiplayer, hasStarted, onGameStart]);
+
+  const handleSoloDurationChange = (seconds: number) => {
+    setDuration(seconds);
+    setTimeLeft(seconds);
+    setText(generateText(200));
+    setHasStarted(false);
+    setHasFinished(false);
+    setLocalStats({ wpm: 0, accuracy: 100, progress: 0 });
+    if (timerRef.current) clearInterval(timerRef.current);
   };
 
   return (
-    <div className="pb-8">
-      {/* Duration selector (only for solo) */}
-      {!isMultiplayer && (
-        <div className="flex justify-center gap-2 mb-4">
-          {TIME_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              onClick={() => startGame(opt.seconds)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                duration === opt.seconds ? 'bg-hrsh-accent text-white' : 'bg-surface-overlay text-text-secondary hover:bg-surface-hover'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Stats bar */}
-      <div className="flex justify-center gap-6 mb-4">
-        <div className="text-center">
-          <div className="font-mono text-2xl font-bold tabular-nums text-purple-400">{wpm}</div>
-          <div className="text-xs text-text-muted">WPM</div>
-        </div>
-        <div className="text-center">
-          <div className={`font-mono text-2xl font-bold tabular-nums ${accuracy >= 95 ? 'text-status-success' : accuracy >= 80 ? 'text-status-warning' : 'text-status-error'}`}>
-            {accuracy}%
-          </div>
-          <div className="text-xs text-text-muted">Accuracy</div>
-        </div>
-        <div className="text-center">
-          <div className={`font-mono text-2xl font-bold tabular-nums ${timeLeft <= 10 ? 'text-status-error' : 'text-text-primary'}`}>
-            {timeLeft}s
-          </div>
-          <div className="text-xs text-text-muted">Time</div>
-        </div>
-      </div>
-
-      {/* Text display */}
-      <div className="bg-surface-raised border border-border-default rounded-xl p-4 sm:p-6 max-w-2xl mx-auto mb-4">
-        <div className="font-mono text-sm sm:text-base leading-relaxed h-32 overflow-hidden select-none">
-          {renderText()}
-        </div>
-      </div>
-
-      {/* Hidden input */}
-      <div className="max-w-2xl mx-auto">
-        <input
-          ref={inputRef}
-          type="text"
-          value={typed}
-          onChange={handleInput}
-          disabled={finished}
-          className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 font-mono text-sm text-text-primary focus:outline-none focus:border-hrsh-accent focus:ring-1 focus:ring-hrsh-accent transition-colors shadow-inner"
-          placeholder={started ? '' : 'Start typing...'}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-        />
-      </div>
-
-      {/* Controls hint */}
-      {!started && !finished && (
-        <div className="mt-3 text-center text-text-muted text-xs font-medium uppercase tracking-widest animate-pulse">
-          Start typing to begin
-        </div>
-      )}
+    <div className="pb-8 max-w-4xl mx-auto flex flex-col h-full">
       
-      {renderLeaderboard()}
+      {/* Top Header / Stats */}
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 px-2 gap-4">
+        {/* Solo duration selector */}
+        {!isMultiplayer ? (
+          <div className="flex gap-2 bg-surface-raised p-1 rounded-xl border border-border-default">
+            {TIME_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => handleSoloDurationChange(opt.seconds)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  duration === opt.seconds 
+                    ? 'bg-hrsh-accent text-white shadow-md' 
+                    : 'text-text-secondary hover:bg-surface-overlay hover:text-text-primary'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="font-bold text-lg tracking-tight text-text-primary uppercase flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-status-success animate-pulse"></span>
+            Live Race
+          </div>
+        )}
+
+        <div className="flex items-center gap-6 sm:gap-10 bg-surface-raised px-6 py-2 rounded-xl border border-border-default shadow-sm">
+          <div className="flex flex-col items-center">
+            <div className="font-mono text-2xl font-bold text-hrsh-accent">{localStats.wpm}</div>
+            <div className="text-[10px] text-text-muted uppercase font-bold tracking-wider">WPM</div>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className={`font-mono text-2xl font-bold ${localStats.accuracy >= 95 ? 'text-status-success' : localStats.accuracy >= 80 ? 'text-status-warning' : 'text-status-error'}`}>
+              {localStats.accuracy}%
+            </div>
+            <div className="text-[10px] text-text-muted uppercase font-bold tracking-wider">ACC</div>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className={`font-mono text-2xl font-bold ${timeLeft <= 10 ? 'text-status-error animate-pulse' : 'text-text-primary'}`}>
+              {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </div>
+            <div className="text-[10px] text-text-muted uppercase font-bold tracking-wider">TIME</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Typing Area */}
+      <TypingArea 
+        challengeText={text}
+        isPaused={isPaused || hasFinished}
+        started={hasStarted}
+        onFirstKeydown={handleFirstKeydownSolo}
+        onProgressThrottled={handleProgressThrottled}
+        onLocalStatsUpdate={handleLocalStatsUpdate}
+        onFinish={handleTypingFinish}
+      />
+
+      {/* Multiplayer Leaderboard */}
+      {isMultiplayer && (
+        <div className="mt-2 flex-1 min-h-[300px]">
+          <TypingLeaderboard 
+            players={roomPlayers} 
+            myPlayerId={myPlayerId} 
+            maxDisplay={10} 
+          />
+        </div>
+      )}
+
     </div>
   );
 }
