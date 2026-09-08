@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, Suspense } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useRoomStore } from '../../stores/roomStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { RoomEngine } from '../../multiplayer/RoomEngine';
@@ -18,14 +18,18 @@ export default function RoomLobby() {
   const [showSettings, setShowSettings] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const location = useLocation();
+
   useEffect(() => {
     if (roomId && player) {
-      RoomEngine.connect(roomId.toUpperCase());
+      const searchParams = new URLSearchParams(location.search);
+      const requestedTeamCode = searchParams.get('team');
+      RoomEngine.connect(roomId.toUpperCase(), requestedTeamCode);
     }
     return () => {
       RoomEngine.disconnect();
     };
-  }, [roomId, player]);
+  }, [roomId, player, location.search]);
 
   // Room settings are now applied immediately during ROOM_JOIN via RoomEngine using sessionStorage.
   // We no longer need to rely on location.state.
@@ -161,6 +165,59 @@ export default function RoomLobby() {
   const activePlayers = room.players.filter(p => !p.isSpectator);
   const spectators = room.players.filter(p => p.isSpectator);
 
+  const renderPlayer = (p: any) => (
+    <div key={p.id} className={`p-4 flex items-center justify-between hover:bg-surface-overlay transition-colors ${p.connectionState === 'DISCONNECTED' ? 'opacity-50' : ''}`}>
+      <div className="flex items-center gap-3">
+        <PlayerCard playerId={p.id} playerName={p.name}>
+          <div className="w-10 h-10 rounded-full bg-surface-base border border-border-default flex items-center justify-center font-bold text-lg cursor-pointer transition-hrsh hover-lift">
+            {p.name?.[0]?.toUpperCase()}
+          </div>
+        </PlayerCard>
+        <div>
+          <div className="font-medium flex items-center gap-2">
+            {p.name}
+            {p.isHost && <span title="Host">👑</span>}
+            {p.id === player?.id && <span className="text-xs text-text-muted">(You)</span>}
+          </div>
+          {p.connectionState === 'DISCONNECTED' && (
+            <div className="text-[10px] text-status-warning font-bold uppercase mt-0.5">Disconnected</div>
+          )}
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-3">
+        {p.isReady ? (
+          <span className="px-3 py-1 bg-status-success/20 text-status-success text-xs font-bold uppercase rounded-lg">Ready ✓</span>
+        ) : (
+          <span className="px-3 py-1 bg-surface-base text-text-muted text-xs font-bold uppercase rounded-lg">Waiting</span>
+        )}
+        
+        {isHost && p.id !== player?.id && (
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => {
+                if (window.confirm(`Transfer host to ${p.name}?`)) {
+                  RoomEngine.transferHost(p.id);
+                }
+              }}
+              className="text-text-muted hover:text-hrsh-accent text-xs p-1 opacity-50 hover:opacity-100 transition-opacity"
+              title="Make Host"
+            >
+              👑
+            </button>
+            <button 
+              onClick={() => RoomEngine.kickPlayer(p.id)}
+              className="text-text-muted hover:text-status-danger text-xs p-1"
+              title="Kick Player"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
@@ -221,6 +278,40 @@ export default function RoomLobby() {
                 onCancel={() => setShowSettings(false)}
               />
             </div>
+          ) : room.teamsEnabled ? (
+            <div className="space-y-4">
+              {room.teams.map(team => {
+                const teamPlayers = activePlayers.filter(p => p.teamId === team.id);
+                return (
+                  <div key={team.id} className="bg-surface-raised border border-border-default rounded-2xl overflow-hidden shadow-sm">
+                    <div className="p-4 border-b border-border-default flex items-center justify-between" style={{ backgroundColor: `${team.color}15`, borderColor: `${team.color}30` }}>
+                      <h2 className="font-bold text-sm uppercase tracking-wider" style={{ color: team.color }}>
+                        {team.name}
+                      </h2>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-bold bg-surface-base px-2 py-1 rounded border border-border-default">
+                          {team.joinCode}
+                        </span>
+                        <button 
+                          onClick={() => { navigator.clipboard.writeText(team.joinCode); }}
+                          className="text-xs px-2 py-1 bg-surface-base hover:bg-surface-hover rounded border border-border-default transition-colors"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-border-default">
+                      {teamPlayers.map(renderPlayer)}
+                      {teamPlayers.length === 0 && (
+                        <div className="p-4 text-sm text-text-muted italic flex items-center justify-center opacity-70">
+                          Empty Team
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
             <div className="bg-surface-raised border border-border-default rounded-2xl overflow-hidden">
               <div className="p-4 bg-surface-overlay border-b border-border-default flex items-center justify-between">
@@ -228,42 +319,7 @@ export default function RoomLobby() {
               </div>
               
               <div className="divide-y divide-border-default">
-                {activePlayers.map((p) => (
-                  <div key={p.id} className="p-4 flex items-center justify-between hover:bg-surface-overlay transition-colors">
-                    <div className="flex items-center gap-3">
-                      <PlayerCard playerId={p.id} playerName={p.name}>
-                        <div className="w-10 h-10 rounded-full bg-surface-base border border-border-default flex items-center justify-center font-bold text-lg cursor-pointer transition-hrsh hover-lift">
-                          {p.name?.[0]?.toUpperCase()}
-                        </div>
-                      </PlayerCard>
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
-                          {p.name}
-                          {p.isHost && <span title="Host">👑</span>}
-                          {p.id === player?.id && <span className="text-xs text-text-muted">(You)</span>}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      {p.isReady ? (
-                        <span className="px-3 py-1 bg-status-success/20 text-status-success text-xs font-bold uppercase rounded-lg">Ready ✓</span>
-                      ) : (
-                        <span className="px-3 py-1 bg-surface-base text-text-muted text-xs font-bold uppercase rounded-lg">Waiting</span>
-                      )}
-                      
-                      {isHost && p.id !== player?.id && (
-                        <button 
-                          onClick={() => RoomEngine.kickPlayer(p.id)}
-                          className="text-text-muted hover:text-status-danger text-xs p-1"
-                          title="Kick Player"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                {activePlayers.map(renderPlayer)}
                 
                 {/* Empty Slots */}
                 {Array.from({ length: room.settings.maxPlayers - activePlayers.length }).map((_, i) => (
@@ -306,15 +362,42 @@ export default function RoomLobby() {
               </button>
             )}
 
-            <button
-              onClick={() => navigate('/multiplayer')}
-              className="w-full py-3 bg-transparent hover:bg-surface-base text-text-muted hover:text-status-danger font-semibold rounded-xl text-sm transition-colors"
-            >
-              Leave Room
-            </button>
-          </div>
+              <button
+                onClick={() => navigate('/multiplayer')}
+                className="w-full py-3 bg-transparent hover:bg-surface-base text-text-muted hover:text-status-danger font-semibold rounded-xl text-sm transition-colors"
+              >
+                Leave Room
+              </button>
+            </div>
 
-          {/* Spectators */}
+            {room.teamsEnabled && !me?.isSpectator && (
+              <div className="bg-surface-raised border border-border-default rounded-2xl p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">Join Team</h3>
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const input = new FormData(e.currentTarget).get('teamCode') as string;
+                    if (input && input.trim().length === 4) {
+                      RoomEngine.joinTeam(input.trim().toUpperCase());
+                    }
+                  }}
+                  className="flex gap-2"
+                >
+                  <input 
+                    type="text" 
+                    name="teamCode" 
+                    placeholder="Code" 
+                    maxLength={4}
+                    className="w-full bg-surface-base border border-border-default rounded-xl px-3 py-2 text-sm text-center font-bold uppercase focus:outline-none focus:border-hrsh-accent placeholder:font-normal placeholder:normal-case"
+                  />
+                  <button type="submit" className="px-4 py-2 bg-surface-overlay hover:bg-surface-hover border border-border-default rounded-xl font-medium text-sm transition-colors">
+                    Join
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Spectators */}
           {room.settings.spectatorsAllowed && (
             <div className="bg-surface-raised border border-border-default rounded-2xl p-4">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3 flex items-center justify-between">

@@ -23,12 +23,15 @@ export default function Profile() {
     if (!player) return;
     document.title = 'Profile — HRSH';
 
-    ScoreEngine.getStats(player.id).then(setStats);
-    ScoreEngine.getAllPersonalBests(player.id).then(setPersonalBests);
-    ScoreEngine.getGameHistory(player.id, undefined, 10).then(setRecentHistory);
-    AchievementEngine.getUnlockedAchievements(player.id).then(setUnlockedAchievements);
-    XPEngine.getXPStats(player.id).then(setXpProgress);
-  }, [player]);
+    // Force sync with server on profile load
+    usePlayerStore.getState().initialize().then(() => {
+      ScoreEngine.getStats(player.id).then(setStats);
+      ScoreEngine.getAllPersonalBests(player.id).then(setPersonalBests);
+      ScoreEngine.getGameHistory(player.id, undefined, 10).then(setRecentHistory);
+      AchievementEngine.getUnlockedAchievements(player.id).then(setUnlockedAchievements);
+      XPEngine.getXPStats(player.id).then(setXpProgress);
+    });
+  }, [player?.id]);
 
   const handleSaveName = async () => {
     const trimmed = nameInput.trim();

@@ -1,4 +1,5 @@
 import { useMemo, memo } from 'react';
+import { useRoomStore } from '../../stores/roomStore';
 import type { PlayerInfo } from '../../stores/roomStore';
 
 interface TypingLeaderboardProps {
@@ -8,6 +9,9 @@ interface TypingLeaderboardProps {
 }
 
 export const TypingLeaderboard = memo(function TypingLeaderboard({ players, myPlayerId, maxDisplay = 10 }: TypingLeaderboardProps) {
+  const room = useRoomStore();
+  const { teamsEnabled, teams } = room;
+
   // Memoize sorted players to avoid recalculating unnecessarily
   const sortedPlayers = useMemo(() => {
     return [...players]
@@ -49,6 +53,62 @@ export const TypingLeaderboard = memo(function TypingLeaderboard({ players, myPl
     
     return combined;
   }, [sortedPlayers, myPlayerId, maxDisplay]);
+
+  if (teamsEnabled && teams.length > 0) {
+    // Team mode rendering
+    const teamStats = teams.map(team => {
+      const teamPlayers = sortedPlayers.filter(p => p.teamId === team.id);
+      const totalProgress = teamPlayers.reduce((sum, p) => sum + (p.progress || 0), 0);
+      const totalWPM = teamPlayers.reduce((sum, p) => sum + (p.liveMetricValue || 0), 0);
+      const avgProgress = teamPlayers.length > 0 ? totalProgress / teamPlayers.length : 0;
+      const avgWpm = teamPlayers.length > 0 ? Math.round(totalWPM / teamPlayers.length) : 0;
+      const allFinished = teamPlayers.length > 0 && teamPlayers.every((p: any) => p.finished);
+      
+      return {
+        ...team,
+        players: teamPlayers,
+        progress: avgProgress,
+        wpm: avgWpm,
+        finished: allFinished
+      };
+    }).sort((a, b) => b.progress - a.progress);
+
+    return (
+      <div className="bg-surface-raised border border-border-default rounded-xl p-4 w-full">
+        <h3 className="font-semibold text-xs mb-4 uppercase tracking-wider text-text-muted flex justify-between">
+          <span>Team Race</span>
+          <span>{teams.length} Teams</span>
+        </h3>
+        <div className="flex flex-col gap-4">
+          {teamStats.map((team, index) => {
+            const isMyTeam = team.players.some((p: any) => p.id === myPlayerId);
+            const progressPct = Math.min(100, Math.max(0, team.progress * 100));
+            return (
+              <div key={team.id} className={`flex flex-col gap-2 p-3 rounded-xl border ${isMyTeam ? 'bg-surface-overlay' : 'bg-surface-base'}`} style={{ borderColor: isMyTeam ? team.color : 'var(--color-border-default)' }}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 font-mono font-bold text-xs text-text-muted">#{index + 1}</div>
+                    <div className="font-bold text-sm truncate" style={{ color: team.color }}>{team.name} {isMyTeam && '(Your Team)'}</div>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs font-mono">
+                    <span className="text-text-muted">{team.finished ? 'FINISHED' : `${team.wpm} AVG WPM`}</span>
+                    <span className="font-bold" style={{ color: team.color }}>{Math.round(progressPct)}%</span>
+                  </div>
+                </div>
+                
+                <div className="w-full bg-surface-overlay h-2.5 rounded-full overflow-hidden shadow-inner border border-border-default">
+                  <div 
+                    className="h-full transition-all duration-300 ease-out" 
+                    style={{ width: `${progressPct}%`, backgroundColor: team.color }} 
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface-raised border border-border-default rounded-xl p-4 w-full">

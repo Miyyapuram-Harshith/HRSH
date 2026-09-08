@@ -8,6 +8,12 @@ export interface Player {
   createdAt: number;
   updatedAt: number;
   isPremium?: boolean;
+  xp?: number;
+  level?: number;
+  gamesPlayed?: number;
+  wins?: number;
+  losses?: number;
+  title?: string;
 }
 
 export interface PlayerSettings {

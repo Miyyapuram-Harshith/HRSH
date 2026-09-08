@@ -11,6 +11,42 @@ export class MatchEngine {
         winningLine: null,
         isDraw: false
       };
+    } else if (gameId === '2048') {
+      const size = parseInt(settings?.gameSettings?.boardSize || '4');
+      return {
+        boards: Object.fromEntries(activePlayers.map(id => [id, Array(size * size).fill(0)])),
+        scores: Object.fromEntries(activePlayers.map(id => [id, 0])),
+        finished: Object.fromEntries(activePlayers.map(id => [id, false])),
+        size,
+        players: activePlayers,
+        winner: null,
+      };
+    } else if (gameId === 'minesweeper') {
+      return {
+        boards: Object.fromEntries(activePlayers.map(id => [id, { cells: [], width: 10, height: 10, mines: 10 }])), // Simplified empty state, clients handle local clicks and send verified updates
+        scores: Object.fromEntries(activePlayers.map(id => [id, 0])),
+        finished: Object.fromEntries(activePlayers.map(id => [id, false])),
+        players: activePlayers,
+        winner: null,
+      };
+    } else if (gameId === 'reaction-test') {
+      return {
+        round: 1,
+        maxRounds: settings?.gameSettings?.rounds || 5,
+        targetTime: Date.now() + 2000 + Math.random() * 3000,
+        scores: Object.fromEntries(activePlayers.map(id => [id, 0])),
+        finished: Object.fromEntries(activePlayers.map(id => [id, false])),
+        players: activePlayers,
+        winner: null,
+      };
+    } else if (gameId === 'sudoku') {
+      return {
+        puzzle: '', // Will be generated or selected
+        progress: Object.fromEntries(activePlayers.map(id => [id, 0])),
+        finished: Object.fromEntries(activePlayers.map(id => [id, false])),
+        players: activePlayers,
+        winner: null,
+      };
     } else if (gameId === 'connect-four') {
       return {
         board: Array(6).fill(null).map(() => Array(7).fill(null)),
@@ -39,6 +75,16 @@ export class MatchEngine {
       };
     } else if (gameId === 'chess') {
       const chess = new Chess();
+      let initialTime = 600; // 10 min
+      let increment = 0;
+      
+      const tc = settings?.gameSettings?.timeControl || '10+0';
+      const [minStr, incStr] = tc.split('+');
+      if (minStr && incStr) {
+        initialTime = parseInt(minStr) * 60;
+        increment = parseInt(incStr);
+      }
+
       return {
         players: activePlayers,
         turn: activePlayers[0], // White
@@ -47,7 +93,15 @@ export class MatchEngine {
         winner: null,
         isDraw: false,
         whiteId: activePlayers[0],
-        blackId: activePlayers[1] || null
+        blackId: activePlayers[1] || null,
+        clocks: {
+          w: initialTime,
+          b: initialTime
+        },
+        increment,
+        lastMoveTime: Date.now(),
+        drawOffer: null,
+        reason: null
       };
     } else if (gameId === 'word-guesser') {
       return {
@@ -151,24 +205,158 @@ export class MatchEngine {
           }
         }
       }
+
+    } else if (gameId === '2048') {
+      if (action.type === 'UPDATE_SCORE') {
+        gameState.scores[playerId] = action.score;
+        return { updated: true, matchEnded: false };
+      } else if (action.type === 'GAME_OVER') {
+        gameState.finished[playerId] = true;
+        if (Object.values(gameState.finished).every(f => f)) {
+          // Find winner
+          let maxScore = -1;
+          for (const id in gameState.scores) {
+            if (gameState.scores[id] > maxScore) {
+              maxScore = gameState.scores[id];
+              gameState.winner = id;
+            }
+          }
+          return { updated: true, matchEnded: true };
+        }
+        return { updated: true, matchEnded: false };
+      }
+    } else if (gameId === 'minesweeper') {
+      if (action.type === 'WIN') {
+        gameState.scores[playerId] = action.time; // lower is better
+        gameState.finished[playerId] = true;
+        gameState.winner = playerId; // first to win gets it
+        return { updated: true, matchEnded: true };
+      } else if (action.type === 'LOSE') {
+        gameState.finished[playerId] = true;
+        if (Object.values(gameState.finished).every(f => f)) {
+          return { updated: true, matchEnded: true };
+        }
+        return { updated: true, matchEnded: false };
+      }
+    } else if (gameId === 'reaction-test') {
+      if (action.type === 'REACT') {
+        if (!gameState.finished[playerId]) {
+          const reactTime = Date.now() - gameState.targetTime;
+          // Basic anticheat: if too fast, penalty
+          const finalTime = reactTime < 100 ? 5000 : reactTime;
+          gameState.scores[playerId] += finalTime;
+          gameState.finished[playerId] = true;
+          
+          if (Object.values(gameState.finished).every(f => f)) {
+            if (gameState.round >= gameState.maxRounds) {
+              // Find winner (lowest average)
+              let minScore = Infinity;
+              for (const id in gameState.scores) {
+                if (gameState.scores[id] < minScore) {
+                  minScore = gameState.scores[id];
+                  gameState.winner = id;
+                }
+              }
+              return { updated: true, matchEnded: true };
+            } else {
+              // Next round
+              gameState.round++;
+              gameState.targetTime = Date.now() + 2000 + Math.random() * 3000;
+              for (const id in gameState.finished) gameState.finished[id] = false;
+              return { updated: true, matchEnded: false };
+            }
+          }
+        }
+      }
+    } else if (gameId === 'sudoku') {
+      if (action.type === 'SOLVE') {
+        gameState.winner = playerId;
+        return { updated: true, matchEnded: true };
+      } else if (action.type === 'UPDATE_PROGRESS') {
+        gameState.progress[playerId] = action.progress;
+        return { updated: true, matchEnded: false };
+      }
     } else if (gameId === 'chess') {
+      const isWhiteTurn = gameState.turn === gameState.whiteId;
+      const isWhite = playerId === gameState.whiteId;
+      const isBlack = playerId === gameState.blackId;
+      
+      if (!isWhite && !isBlack) return { updated: false, matchEnded: false }; // Spectator
+
+      if (action.type === 'RESIGN') {
+        gameState.winner = isWhite ? gameState.blackId : gameState.whiteId;
+        gameState.reason = 'Resignation';
+        return { updated: true, matchEnded: true };
+      }
+
+      if (action.type === 'OFFER_DRAW') {
+        if (gameState.drawOffer === playerId) return { updated: false, matchEnded: false };
+        if (gameState.drawOffer && gameState.drawOffer !== playerId) {
+          // Accept draw
+          gameState.isDraw = true;
+          gameState.reason = 'Draw by Agreement';
+          return { updated: true, matchEnded: true };
+        } else {
+          gameState.drawOffer = playerId;
+          return { updated: true, matchEnded: false };
+        }
+      }
+
+      if (action.type === 'DECLINE_DRAW') {
+        if (gameState.drawOffer && gameState.drawOffer !== playerId) {
+          gameState.drawOffer = null;
+          return { updated: true, matchEnded: false };
+        }
+      }
+
       if (action.type === 'MOVE') {
-        const isWhiteTurn = gameState.turn === gameState.whiteId;
-        if ((isWhiteTurn && playerId !== gameState.whiteId) || (!isWhiteTurn && playerId !== gameState.blackId)) {
+        if ((isWhiteTurn && !isWhite) || (!isWhiteTurn && !isBlack)) {
           return { updated: false, matchEnded: false };
         }
+        
+        // Update clocks before moving
+        const now = Date.now();
+        const elapsed = Math.floor((now - gameState.lastMoveTime) / 1000);
+        const colorKey = isWhiteTurn ? 'w' : 'b';
+        gameState.clocks[colorKey] = Math.max(0, gameState.clocks[colorKey] - elapsed);
+
+        if (gameState.clocks[colorKey] === 0) {
+          gameState.winner = isWhiteTurn ? gameState.blackId : gameState.whiteId;
+          gameState.reason = 'Timeout';
+          return { updated: true, matchEnded: true };
+        }
+
         try {
           const chess = new Chess(gameState.fen);
           const move = chess.move(action.move);
           if (move) {
+            // Apply increment
+            gameState.clocks[colorKey] += gameState.increment;
+            
             gameState.fen = chess.fen();
             gameState.history.push(move.san);
+            gameState.lastMoveTime = now;
+            gameState.drawOffer = null; // moving cancels draw offers
             
             if (chess.isCheckmate()) {
               gameState.winner = playerId;
+              gameState.reason = 'Checkmate';
               matchEnded = true;
-            } else if (chess.isDraw() || chess.isStalemate() || chess.isThreefoldRepetition() || chess.isInsufficientMaterial()) {
+            } else if (chess.isStalemate()) {
               gameState.isDraw = true;
+              gameState.reason = 'Stalemate';
+              matchEnded = true;
+            } else if (chess.isThreefoldRepetition()) {
+              gameState.isDraw = true;
+              gameState.reason = 'Threefold Repetition';
+              matchEnded = true;
+            } else if (chess.isInsufficientMaterial()) {
+              gameState.isDraw = true;
+              gameState.reason = 'Insufficient Material';
+              matchEnded = true;
+            } else if (chess.isDraw()) {
+              gameState.isDraw = true;
+              gameState.reason = 'Fifty-move Rule';
               matchEnded = true;
             } else {
               gameState.turn = isWhiteTurn ? gameState.blackId : gameState.whiteId;
@@ -198,6 +386,23 @@ export class MatchEngine {
   static tick(gameId: string, gameState: any): { updated: boolean; matchEnded: boolean } {
     if (gameId === 'snake-arena') {
       return this.tickSnakeArena(gameState);
+    } else if (gameId === 'chess') {
+      const now = Date.now();
+      const isWhiteTurn = gameState.turn === gameState.whiteId;
+      const colorKey = isWhiteTurn ? 'w' : 'b';
+      const elapsed = Math.floor((now - gameState.lastMoveTime) / 1000);
+      
+      // Calculate display clock
+      const timeRemaining = Math.max(0, gameState.clocks[colorKey] - elapsed);
+      
+      if (timeRemaining === 0) {
+        // Apply timeout
+        gameState.clocks[colorKey] = 0;
+        gameState.winner = isWhiteTurn ? gameState.blackId : gameState.whiteId;
+        gameState.reason = 'Timeout';
+        return { updated: true, matchEnded: true };
+      }
+      return { updated: false, matchEnded: false }; // No state updates to broadcast continuously, we assume clients predict time
     }
     return { updated: false, matchEnded: false };
   }
@@ -207,6 +412,15 @@ export class MatchEngine {
       const snake = gameState?.snakes?.find((s: any) => s.id === playerId);
       if (snake) snake.isDead = true;
       return { updated: true, matchEnded: false };
+    } else if (gameId === 'chess') {
+      const isWhite = playerId === gameState.whiteId;
+      const isBlack = playerId === gameState.blackId;
+      if (isWhite || isBlack) {
+        gameState.winner = isWhite ? gameState.blackId : gameState.whiteId;
+        gameState.reason = 'Abandonment';
+        return { updated: true, matchEnded: true };
+      }
+      return { updated: false, matchEnded: false };
     } else if (gameId === 'typing-test') {
       return { updated: false, matchEnded: false };
     } else {

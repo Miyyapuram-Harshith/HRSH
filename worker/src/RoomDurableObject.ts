@@ -1,6 +1,7 @@
 import { Env } from './index';
 import { GAME_SCHEMAS } from '../../src/data/gameSchemas';
 import { MatchEngine } from './MatchEngine';
+import { Database } from './db';
 
 export interface RoomSettings {
   gameId: string;
@@ -22,6 +23,9 @@ interface Player {
   isHost: boolean;
   isSpectator: boolean;
   ws?: WebSocket;
+  connectionState: 'CONNECTED' | 'DISCONNECTED';
+  disconnectTimer?: any;
+  teamId?: string; // Team support
   // Match Engine generic fields
   progress: number;
   liveMetricValue: number;
@@ -40,6 +44,17 @@ export class RoomDurableObject {
   private status: RoomStatus = 'WAITING';
   private roomId: string;
   private isCreated: boolean = false;
+  private version: number = 0;
+  
+  private gameId: string = 'tic-tac-toe';
+  private mode: string = 'classic';
+  private gameSettings: any = {};
+  private roomCode: string = '';
+  private createdAt: number = 0;
+  
+  // Team systems
+  private teamsEnabled: boolean = false;
+  private teams: any[] = [];
   
   private gameState: any = null; // Authoritative game state
   private countdownTimer: any = null;
@@ -57,6 +72,12 @@ export class RoomDurableObject {
       this.isCreated = (await this.state.storage.get('isCreated')) || false;
       const savedSettings = await this.state.storage.get<RoomSettings>('settings');
       if (savedSettings) this.settings = savedSettings;
+      
+      this.gameId = (await this.state.storage.get('gameId')) || 'tic-tac-toe';
+      this.mode = (await this.state.storage.get('mode')) || 'classic';
+      this.gameSettings = (await this.state.storage.get('gameSettings')) || {};
+      this.roomCode = (await this.state.storage.get('roomCode')) || '';
+      this.createdAt = (await this.state.storage.get('createdAt')) || Date.now();
     });
   }
 
@@ -67,8 +88,38 @@ export class RoomDurableObject {
 
     if (url.pathname.startsWith('/api/init/') && request.method === 'POST') {
       this.isCreated = true;
-      await this.state.storage.put('isCreated', true);
-      return new Response('OK');
+      let payload: any = {};
+      try {
+        payload = await request.json();
+      } catch (e) {
+        // ignore
+      }
+      
+      this.gameId = payload.gameId || 'tic-tac-toe';
+      this.mode = payload.mode || 'classic';
+      this.settings = payload.settings || {};
+      this.gameSettings = payload.gameSettings || {};
+      this.roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      this.createdAt = Date.now();
+      
+      await Promise.all([
+        this.state.storage.put('isCreated', true),
+        this.state.storage.put('gameId', this.gameId),
+        this.state.storage.put('mode', this.mode),
+        this.state.storage.put('settings', this.settings),
+        this.state.storage.put('gameSettings', this.gameSettings),
+        this.state.storage.put('roomCode', this.roomCode),
+        this.state.storage.put('createdAt', this.createdAt)
+      ]);
+
+      return new Response(JSON.stringify({
+        roomCode: this.roomCode,
+        gameId: this.gameId,
+        mode: this.mode,
+        settings: this.settings,
+        gameSettings: this.gameSettings,
+        createdAt: this.createdAt
+      }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     if (request.headers.get('Upgrade') === 'websocket') {
@@ -138,6 +189,11 @@ export class RoomDurableObject {
     if (existingPlayer) {
       existingPlayer.ws = ws;
       existingPlayer.name = playerName || existingPlayer.name;
+      existingPlayer.connectionState = 'CONNECTED';
+      if (existingPlayer.disconnectTimer) {
+        clearTimeout(existingPlayer.disconnectTimer);
+        existingPlayer.disconnectTimer = undefined;
+      }
       ws.send(JSON.stringify({ type: 'ROOM_JOINED' }));
       this.broadcastState();
       return;
@@ -176,6 +232,11 @@ export class RoomDurableObject {
       }
       
       this.state.storage.put('settings', this.settings);
+      
+      // Initialize teams if needed
+      if (this.settings.gameSettings?.teamMode || this.settings.gameSettings?.teams) {
+        this.initializeTeams();
+      }
     }
 
     const activePlayersCount = Array.from(this.players.values()).filter(p => !p.isSpectator).length;
@@ -188,6 +249,39 @@ export class RoomDurableObject {
 
     const isSpectator = isFull;
 
+    let assignedTeamId: string | undefined;
+    
+    if (this.teamsEnabled && msg.requestedTeamCode) {
+      const requestedTeam = this.teams.find(t => t.joinCode === msg.requestedTeamCode);
+      if (requestedTeam) {
+        // Count players in team
+        const teamPlayers = Array.from(this.players.values()).filter(p => p.teamId === requestedTeam.id);
+        const maxPerTeam = this.settings.maxPlayers / this.teams.length;
+        if (teamPlayers.length >= maxPerTeam) {
+          ws.send(JSON.stringify({ type: 'ERROR', code: 'TEAM_FULL', message: 'This team is full.' }));
+          return;
+        }
+        assignedTeamId = requestedTeam.id;
+      } else {
+        ws.send(JSON.stringify({ type: 'ERROR', code: 'INVALID_TEAM', message: 'Invalid team code.' }));
+        return;
+      }
+    } else if (this.teamsEnabled) {
+      // Auto-assign to smallest team
+      let smallestTeam = this.teams[0];
+      let smallestCount = Infinity;
+      for (const t of this.teams) {
+        const count = Array.from(this.players.values()).filter(p => p.teamId === t.id).length;
+        if (count < smallestCount) {
+          smallestCount = count;
+          smallestTeam = t;
+        }
+      }
+      if (smallestTeam) {
+        assignedTeamId = smallestTeam.id;
+      }
+    }
+
     const player: Player = {
       id: playerId,
       name: playerName,
@@ -195,9 +289,11 @@ export class RoomDurableObject {
       isHost,
       isSpectator,
       ws,
+      connectionState: 'CONNECTED',
       progress: 0,
       liveMetricValue: 0,
-      finished: false
+      finished: false,
+      teamId: assignedTeamId
     };
 
     this.players.set(playerId, player);
@@ -238,8 +334,41 @@ export class RoomDurableObject {
 
           this.settings = newSettings;
           this.state.storage.put('settings', this.settings);
+          
+          if (newSettings.gameSettings?.teamMode || newSettings.gameSettings?.teams) {
+            if (!this.teamsEnabled) {
+              this.initializeTeams();
+            }
+          } else {
+            this.teamsEnabled = false;
+            this.teams = [];
+            for (const p of this.players.values()) {
+              p.teamId = undefined;
+            }
+          }
+          
           this.broadcastState();
           this.updateLiveIndex();
+        }
+        break;
+
+      case 'JOIN_TEAM':
+        if (this.status === 'WAITING' && this.teamsEnabled) {
+          const teamCode = msg.teamCode?.toUpperCase();
+          const targetTeam = this.teams.find(t => t.joinCode === teamCode);
+          if (targetTeam) {
+            // Validate capacity
+            const teamMembers = Array.from(this.players.values()).filter(p => p.teamId === targetTeam.id);
+            const teamSizeLimit = this.settings?.gameSettings?.teamSize || 5; // default 5
+            if (teamMembers.length < teamSizeLimit) {
+              player.teamId = targetTeam.id;
+              this.broadcastState();
+            } else {
+              player.ws?.send(JSON.stringify({ type: 'ERROR', message: 'Team is full.' }));
+            }
+          } else {
+            player.ws?.send(JSON.stringify({ type: 'ERROR', message: 'Invalid team code.' }));
+          }
         }
         break;
 
@@ -264,6 +393,17 @@ export class RoomDurableObject {
             target.ws.send(JSON.stringify({ type: 'KICKED' }));
             target.ws.close();
             this.handleDisconnect(msg.targetId);
+          }
+        }
+        break;
+
+      case 'TRANSFER_HOST':
+        if (player.isHost && msg.targetId && msg.targetId !== playerId) {
+          const target = this.players.get(msg.targetId);
+          if (target) {
+            player.isHost = false;
+            target.isHost = true;
+            this.broadcastState();
           }
         }
         break;
@@ -344,6 +484,35 @@ export class RoomDurableObject {
     }, 1000);
   }
 
+  private initializeTeams() {
+    this.teamsEnabled = true;
+    const generateCode = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+    
+    this.teams = [
+      { id: 'team-red', name: 'Red Team', color: '#ef4444', joinCode: generateCode() },
+      { id: 'team-blue', name: 'Blue Team', color: '#3b82f6', joinCode: generateCode() }
+    ];
+    
+    // Auto-assign existing players if unassigned
+    let redCount = 0;
+    let blueCount = 0;
+    for (const p of this.players.values()) {
+      if (!p.isSpectator && !p.teamId) {
+        if (redCount <= blueCount) {
+          p.teamId = 'team-red';
+          redCount++;
+        } else {
+          p.teamId = 'team-blue';
+          blueCount++;
+        }
+      } else if (p.teamId === 'team-red') {
+        redCount++;
+      } else if (p.teamId === 'team-blue') {
+        blueCount++;
+      }
+    }
+  }
+
   private startGame() {
     this.status = 'PLAYING';
     
@@ -362,6 +531,18 @@ export class RoomDurableObject {
         }
         if (updated) this.broadcastState();
       }, 150);
+    } else if (this.settings?.gameId === 'chess') {
+      if (this.gameTickTimer) clearInterval(this.gameTickTimer);
+      this.gameTickTimer = setInterval(() => {
+        const { updated, matchEnded } = MatchEngine.tick(this.settings?.gameId || '', this.gameState);
+        if (matchEnded) {
+          this.status = 'RESULTS';
+          if (this.gameTickTimer) { clearInterval(this.gameTickTimer); this.gameTickTimer = null; }
+          this.broadcastState();
+        } else if (updated) {
+          this.broadcastState();
+        }
+      }, 1000);
     } else if (this.settings?.gameId === 'typing-test') {
       if (this.progressTickTimer) clearInterval(this.progressTickTimer);
       this.progressTickTimer = setInterval(() => this.tickProgressBroadcast(), 500);
@@ -385,6 +566,31 @@ export class RoomDurableObject {
 
     if (matchEnded) {
       this.status = 'RESULTS';
+      
+      // Save match to D1 Database
+      if (this.env.DB) {
+        const db = new Database(this.env.DB);
+        const playersData = Array.from(this.players.values()).filter(p => !p.isSpectator).map(p => ({
+          id: p.id,
+          score: p.progress,
+          rank: p.rank || 0,
+          metrics: { liveValue: p.liveMetricValue }
+        }));
+        
+        db.recordMatch(
+          this.settings?.gameId || 'tic-tac-toe',
+          this.settings?.mode || 'classic',
+          this.settings || {},
+          this.gameState.winner || null,
+          playersData
+        ).catch(err => console.error("Failed to save match to DB:", err));
+        
+        // Add XP to participants (e.g. 50 for win, 10 for loss/draw)
+        playersData.forEach(p => {
+          const xp = p.id === this.gameState.winner ? 50 : 10;
+          db.addXP(p.id, xp).catch(err => console.error("Failed to add XP:", err));
+        });
+      }
     }
 
     if (updated || matchEnded) {
@@ -449,43 +655,53 @@ export class RoomDurableObject {
     const player = this.players.get(playerId);
     if (!player) return;
 
-    this.players.delete(playerId);
-
-    if (this.players.size === 0) {
-      this.updateLiveIndex(true);
-      return;
-    }
-
-    if (player.isHost) {
-      const nextHost = Array.from(this.players.values())[0];
-      if (nextHost) nextHost.isHost = true;
-    }
-
-    if ((this.status === 'PLAYING' || this.status === 'FINISHING') && !player.isSpectator) {
-      const { matchEnded } = MatchEngine.handleDisconnect(this.settings?.gameId || '', this.gameState, playerId);
-      if (matchEnded) {
-        this.status = 'RESULTS';
-        if (this.gameTickTimer) {
-          clearInterval(this.gameTickTimer);
-          this.gameTickTimer = null;
-        }
-      } else if (this.settings?.gameId === 'typing-test') {
-        player.finished = true;
-        this.checkMatchEnd();
-      }
-    }
-
+    player.connectionState = 'DISCONNECTED';
+    player.ws = undefined;
     this.broadcastState();
-    this.updateLiveIndex();
+
+    // 30 second grace period
+    player.disconnectTimer = setTimeout(() => {
+      this.players.delete(playerId);
+
+      if (this.players.size === 0) {
+        this.updateLiveIndex(true);
+        return;
+      }
+
+      if (player.isHost) {
+        const nextHost = Array.from(this.players.values()).find(p => p.connectionState === 'CONNECTED');
+        if (nextHost) nextHost.isHost = true;
+      }
+
+      if ((this.status === 'PLAYING' || this.status === 'FINISHING') && !player.isSpectator) {
+        const { matchEnded } = MatchEngine.handleDisconnect(this.settings?.gameId || '', this.gameState, playerId);
+        if (matchEnded) {
+          this.status = 'RESULTS';
+          if (this.gameTickTimer) {
+            clearInterval(this.gameTickTimer);
+            this.gameTickTimer = null;
+          }
+        } else if (this.settings?.gameId === 'typing-test') {
+          player.finished = true;
+          this.checkMatchEnd();
+        }
+      }
+
+      this.broadcastState();
+      this.updateLiveIndex();
+    }, 30000);
   }
 
   private broadcastState() {
+    this.version++;
     const clientPlayers = Array.from(this.players.values()).map(p => ({
       id: p.id,
       name: p.name,
       isReady: p.isReady,
       isHost: p.isHost,
       isSpectator: p.isSpectator,
+      connectionState: p.connectionState,
+      teamId: p.teamId,
       progress: p.progress,
       liveMetricValue: p.liveMetricValue,
       rank: p.rank,
@@ -496,8 +712,11 @@ export class RoomDurableObject {
       type: 'ROOM_STATE',
       state: {
         roomId: this.roomId,
+        version: this.version,
         status: this.status,
         settings: this.settings,
+        teamsEnabled: this.teamsEnabled,
+        teams: this.teams,
         players: clientPlayers,
         gameState: this.gameState,
         countdown: this.countdownValue

@@ -19,14 +19,15 @@ export default function CreateRoom() {
     try {
       const res = await fetch(`${URL_BASE}/api/create-room`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
       });
       if (!res.ok) throw new Error('Failed to create room');
       const data = await res.json();
       
-      // Navigate to the lobby. We pass the settings in localStorage so that 
-      // when the room connects, the host can immediately apply them.
-      // We don't rely on location.state because a refresh would lose it.
-      sessionStorage.setItem(`hrsh_initial_settings_${data.roomId}`, JSON.stringify(settings));
+      if (!data.success || !data.roomId) {
+        throw new Error('Invalid response from server');
+      }
       
       navigate(`/room/${data.roomId}`);
     } catch (err) {

@@ -18,13 +18,16 @@ export class RoomEngine {
     ? `wss://${window.location.host}`
     : 'ws://localhost:8787';
 
-  static async connect(roomId: string) {
+  static async connect(roomId: string, requestedTeamCode?: string | null) {
     const { player } = usePlayerStore.getState();
     if (!player) return;
 
     this.currentRoomId = roomId;
     this.disconnect(true); // silent disconnect (no state reset)
-    useRoomStore.getState().reset();
+    // Only reset state if we are joining a completely new room
+    if (useRoomStore.getState().roomId !== roomId) {
+      useRoomStore.getState().reset();
+    }
     useRoomStore.getState().updateState({ roomId, connectionState: 'CONNECTING' });
 
     const wsUrl = `${this.URL_BASE}/api/room/${roomId}?playerId=${player.id}&playerName=${encodeURIComponent(player.name || 'Anonymous')}`;
@@ -66,7 +69,8 @@ export class RoomEngine {
         type: 'ROOM_JOIN',
         playerId: player.id,
         playerName: player.name,
-        initialSettings
+        initialSettings,
+        requestedTeamCode
       }));
 
       // Start heartbeat
@@ -85,6 +89,10 @@ export class RoomEngine {
           }
           this.messageQueue = [];
         } else if (msg.type === 'ROOM_STATE') {
+          const currentVersion = useRoomStore.getState().version;
+          if (msg.state.version && msg.state.version <= currentVersion) {
+            return; // Ignore stale state
+          }
           useRoomStore.getState().updateState({ ...msg.state, connectionState: 'CONNECTED' });
         } else if (msg.type === 'ERROR') {
           useRoomStore.getState().updateState({ connectionState: 'ERROR', error: msg.message });
@@ -232,6 +240,10 @@ export class RoomEngine {
 
   static unlockRoom() {
     this.send({ type: 'UNLOCK_ROOM' });
+  }
+
+  static joinTeam(teamCode: string) {
+    this.send({ type: 'JOIN_TEAM', teamCode });
   }
 
   static sendGameAction(action: any) {

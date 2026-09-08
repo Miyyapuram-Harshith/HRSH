@@ -21,43 +21,61 @@ export class PlayerService {
    * Get or create the local player.
    */
   static async getOrCreatePlayer(): Promise<Player> {
+    let player: Player | undefined;
     const players = await db.players.toArray();
+    
     if (players.length > 0) {
-      return players[0];
+      player = players[0];
+    } else {
+      // First visit — create anonymous player
+      player = {
+        id: generateId(),
+        name: '',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await db.players.add(player);
+
+      // Create default settings
+      const settings: PlayerSettings = {
+        playerId: player.id,
+        theme: 'dark',
+        reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false,
+        soundEnabled: true,
+        musicEnabled: false,
+        volume: 0.7,
+        hapticFeedback: true,
+      };
+      await db.settings.add(settings);
     }
-
-    // First visit — create anonymous player
-    const player: Player = {
-      id: generateId(),
-      name: '',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    await db.players.add(player);
-
-    // Create default settings
-    const settings: PlayerSettings = {
-      playerId: player.id,
-      theme: 'dark',
-      reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false,
-      soundEnabled: true,
-      musicEnabled: false,
-      volume: 0.7,
-      hapticFeedback: true,
-    };
-    await db.settings.add(settings);
-
-    // Create initial streak
-    const streak: PlayerStreak = {
-      playerId: player.id,
-      currentStreak: 0,
-      longestStreak: 0,
-      lastPlayedDate: '',
-      streakFreezes: 0,
-    };
-    await db.streaks.add(streak);
-
+    
+    // Sync with D1 backend
+    try {
+      const URL_BASE = import.meta.env.PROD 
+        ? window.location.origin
+        : 'http://localhost:8787';
+      const res = await fetch(`${URL_BASE}/api/player/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: player.id, name: player.name })
+      });
+      if (res.ok) {
+        const remotePlayer = await res.json();
+        // Merge XP, level, games_played from remote
+        await db.players.update(player.id, {
+          xp: remotePlayer.xp,
+          level: remotePlayer.level,
+          gamesPlayed: remotePlayer.games_played,
+          wins: remotePlayer.wins,
+          losses: remotePlayer.losses,
+          title: remotePlayer.title
+        });
+        player = await db.players.get(player.id) as Player;
+      }
+    } catch (err) {
+      console.warn("Failed to sync player profile with server:", err);
+    }
+    
     return player;
   }
 

@@ -6,6 +6,8 @@ export interface PlayerInfo {
   isHost: boolean;
   isReady: boolean;
   isSpectator: boolean;
+  connectionState: 'CONNECTED' | 'DISCONNECTED';
+  teamId?: string;
   progress?: number;
   liveMetricValue?: number;
   rank?: number;
@@ -31,8 +33,11 @@ export type RoomStatus = 'WAITING' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISH
 
 interface RoomState {
   roomId: string | null;
+  version: number;
   status: RoomStatus;
   settings: RoomSettings | null;
+  teamsEnabled: boolean;
+  teams: any[];
   players: PlayerInfo[];
   gameState: any;
   countdown: number;
@@ -48,8 +53,11 @@ interface RoomState {
 
 export const useRoomStore = create<RoomState>((set) => ({
   roomId: null,
+  version: 0,
   status: 'WAITING',
   settings: null,
+  teamsEnabled: false,
+  teams: [],
   players: [],
   gameState: null,
   countdown: 0,
@@ -62,8 +70,11 @@ export const useRoomStore = create<RoomState>((set) => ({
   setError: (error) => set({ error }),
   reset: () => set({
     roomId: null,
+    version: 0,
     status: 'WAITING',
     settings: null,
+    teamsEnabled: false,
+    teams: [],
     players: [],
     gameState: null,
     countdown: 0,
