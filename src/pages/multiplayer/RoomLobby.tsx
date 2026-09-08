@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, Suspense } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../../stores/roomStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { RoomEngine } from '../../multiplayer/RoomEngine';
@@ -7,11 +7,10 @@ import { GameRegistry } from '../../engine/GameRegistry';
 import { getGameComponent } from '../../utils/gameCache';
 import { RoomSettingsPanel } from '../../components/multiplayer/RoomSettingsPanel';
 import { PlayerCard } from '../../components/ui/PlayerCard';
-import { MultiplayerResultScreen } from './MultiplayerResultScreen';
+import { MultiplayerResultScreen } from '../../components/multiplayer/MultiplayerResultScreen';
 
 export default function RoomLobby() {
   const { roomId } = useParams<{ roomId: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
   const { player } = usePlayerStore();
   

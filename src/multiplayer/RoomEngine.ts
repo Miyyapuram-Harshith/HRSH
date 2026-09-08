@@ -1,4 +1,4 @@
-import { useRoomStore, ConnectionState } from '../stores/roomStore';
+import { useRoomStore, type ConnectionState } from '../stores/roomStore';
 import { usePlayerStore } from '../stores/playerStore';
 
 const MAX_RECONNECT_ATTEMPTS = 10;
