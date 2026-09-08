@@ -5,6 +5,7 @@ import { ScoreEngine } from '../engine/ScoreEngine';
 import { AnalyticsEngine } from '../engine/AnalyticsEngine';
 import { usePlayerStore } from '../stores/playerStore';
 import { GameShell } from '../components/game/GameShell';
+import { PlayerCustomizationPanel } from '../components/multiplayer/PlayerCustomizationPanel';
 import type { PersonalBest } from '../types/player';
 
 import { getGameComponent } from '../utils/gameCache';
@@ -121,6 +122,18 @@ export default function GamePage() {
             <span className="font-mono font-bold" style={{ color: game.color }}>
               {personalBest.score.toLocaleString()}
             </span>
+          </div>
+        )}
+
+        {/* Game Customization */}
+        {game.customizationSchema && (
+          <div className="mt-6 pt-6 border-t border-border-default">
+            <PlayerCustomizationPanel gameId={game.id} standalone={false} onCustomizationChange={(c) => {
+              // Optionally we can update playerStore here or let GameComponent pull it
+              usePlayerStore.getState().updateSettings({
+                 customizations: { ...(usePlayerStore.getState().settings?.customizations || {}), [game.id]: c }
+              });
+            }} />
           </div>
         )}
 

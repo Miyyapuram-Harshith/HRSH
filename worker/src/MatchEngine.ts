@@ -1,12 +1,13 @@
 import { Chess } from 'chess.js';
 
 export class MatchEngine {
-  static initialize(gameId: string, settings: any, activePlayers: string[]) {
+  static initialize(gameId: string, settings: any, activePlayers: any[]) {
+    const playerIds = activePlayers.map(p => p.id);
     if (gameId === 'tic-tac-toe') {
       return {
         board: Array(9).fill(null),
-        turn: activePlayers[0],
-        players: activePlayers,
+        turn: playerIds[0],
+        players: playerIds,
         winner: null,
         winningLine: null,
         isDraw: false
@@ -14,11 +15,11 @@ export class MatchEngine {
     } else if (gameId === '2048') {
       const size = parseInt(settings?.gameSettings?.boardSize || '4');
       return {
-        boards: Object.fromEntries(activePlayers.map(id => [id, Array(size * size).fill(0)])),
-        scores: Object.fromEntries(activePlayers.map(id => [id, 0])),
-        finished: Object.fromEntries(activePlayers.map(id => [id, false])),
+        boards: Object.fromEntries(playerIds.map(id => [id, Array(size * size).fill(0)])),
+        scores: Object.fromEntries(playerIds.map(id => [id, 0])),
+        finished: Object.fromEntries(playerIds.map(id => [id, false])),
         size,
-        players: activePlayers,
+        players: playerIds,
         winner: null,
       };
     } else if (gameId === 'minesweeper') {
@@ -50,16 +51,18 @@ export class MatchEngine {
     } else if (gameId === 'connect-four') {
       return {
         board: Array(6).fill(null).map(() => Array(7).fill(null)),
-        turn: activePlayers[0],
-        players: activePlayers,
+        turn: playerIds[0],
+        players: playerIds,
         winner: null,
         isDraw: false
       };
     } else if (gameId === 'snake-arena') {
-      const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#ec4899', '#f97316', '#14b8a6'];
-      const snakes = activePlayers.map((id, i) => ({
-        id,
-        color: colors[i % colors.length],
+      const fallbackColors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#ec4899', '#f97316', '#14b8a6'];
+      const snakes = activePlayers.map((p, i) => ({
+        id: p.id,
+        color: p.customization?.primaryColor || fallbackColors[i % fallbackColors.length],
+        skin: p.customization?.skin || 'classic',
+        trail: p.customization?.trail || 'none',
         body: [{ x: 10 + (i * 2), y: 10 + (i * 2) }],
         dir: { x: 1, y: 0 },
         nextDir: { x: 1, y: 0 },
@@ -68,7 +71,7 @@ export class MatchEngine {
       }));
       return {
         gridSize: { w: 40, h: 40 },
-        players: activePlayers,
+        players: playerIds,
         snakes,
         food: { x: Math.floor(Math.random() * 40), y: Math.floor(Math.random() * 40) },
         winner: null,
@@ -86,14 +89,14 @@ export class MatchEngine {
       }
 
       return {
-        players: activePlayers,
-        turn: activePlayers[0], // White
+        players: playerIds,
+        turn: playerIds[0], // White
         fen: chess.fen(),
         history: [],
         winner: null,
         isDraw: false,
-        whiteId: activePlayers[0],
-        blackId: activePlayers[1] || null,
+        whiteId: playerIds[0],
+        blackId: playerIds[1] || null,
         clocks: {
           w: initialTime,
           b: initialTime
@@ -105,9 +108,9 @@ export class MatchEngine {
       };
     } else if (gameId === 'word-guesser') {
       return {
-        players: activePlayers,
-        scores: Object.fromEntries(activePlayers.map(id => [id, 0])),
-        turn: activePlayers[0],
+        players: playerIds,
+        scores: Object.fromEntries(playerIds.map(id => [id, 0])),
+        turn: playerIds[0],
         word: 'HRSH', // Hardcoded for initial version
         guesses: [],
         phase: 'picking',

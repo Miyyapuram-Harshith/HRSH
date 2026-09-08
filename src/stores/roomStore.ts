@@ -8,6 +8,7 @@ export interface PlayerInfo {
   isSpectator: boolean;
   connectionState: 'CONNECTED' | 'DISCONNECTED';
   teamId?: string;
+  customization?: Record<string, any>;
   progress?: number;
   liveMetricValue?: number;
   rank?: number;

@@ -4,6 +4,7 @@ import { usePlayerStore } from './stores/playerStore';
 import { AppShell } from './components/layout/AppShell';
 import { Onboarding } from './components/shared/Onboarding';
 import { AchievementToast } from './components/shared/AchievementToast';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 // Lazy-loaded pages
 const Home = lazy(() => import('./pages/Home'));
@@ -58,8 +59,9 @@ export default function App() {
   return (
     <>
       <AppShell>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/games" element={<Games />} />
             <Route path="/games/:slug" element={<GamePage />} />
@@ -76,7 +78,8 @@ export default function App() {
             <Route path="/accessibility" element={<Accessibility />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </Suspense>
+          </Suspense>
+        </ErrorBoundary>
       </AppShell>
       <AchievementToast />
     </>

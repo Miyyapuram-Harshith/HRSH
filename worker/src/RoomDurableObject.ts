@@ -22,6 +22,7 @@ interface Player {
   isReady: boolean;
   isHost: boolean;
   isSpectator: boolean;
+  customization?: Record<string, any>;
   ws?: WebSocket;
   connectionState: 'CONNECTED' | 'DISCONNECTED';
   disconnectTimer?: any;
@@ -288,6 +289,7 @@ export class RoomDurableObject {
       isReady: false,
       isHost,
       isSpectator,
+      customization: msg.customization || {},
       ws,
       connectionState: 'CONNECTED',
       progress: 0,
@@ -369,6 +371,13 @@ export class RoomDurableObject {
           } else {
             player.ws?.send(JSON.stringify({ type: 'ERROR', message: 'Invalid team code.' }));
           }
+        }
+        break;
+
+      case 'PLAYER_CUSTOMIZATION_UPDATE':
+        if (this.status === 'WAITING' || this.status === 'READY') {
+          player.customization = msg.customization || {};
+          this.broadcastState();
         }
         break;
 
@@ -516,7 +525,7 @@ export class RoomDurableObject {
   private startGame() {
     this.status = 'PLAYING';
     
-    const activePlayers = Array.from(this.players.values()).filter(p => !p.isSpectator).map(p => p.id);
+    const activePlayers = Array.from(this.players.values()).filter(p => !p.isSpectator);
     
     // Use MatchEngine to initialize state
     this.gameState = MatchEngine.initialize(this.settings?.gameId || '', this.settings, activePlayers);

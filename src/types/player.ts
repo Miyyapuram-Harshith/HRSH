@@ -24,6 +24,7 @@ export interface PlayerSettings {
   musicEnabled: boolean;
   volume: number;
   hapticFeedback: boolean;
+  customizations?: Record<string, Record<string, any>>;
 }
 
 export interface PersonalBest {

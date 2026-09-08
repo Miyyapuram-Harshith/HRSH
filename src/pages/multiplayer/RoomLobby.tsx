@@ -6,6 +6,7 @@ import { RoomEngine } from '../../multiplayer/RoomEngine';
 import { GameRegistry } from '../../engine/GameRegistry';
 import { getGameComponent } from '../../utils/gameCache';
 import { RoomSettingsPanel } from '../../components/multiplayer/RoomSettingsPanel';
+import { PlayerCustomizationPanel } from '../../components/multiplayer/PlayerCustomizationPanel';
 import { PlayerCard } from '../../components/ui/PlayerCard';
 import { MultiplayerResultScreen } from '../../components/multiplayer/MultiplayerResultScreen';
 
@@ -83,7 +84,7 @@ export default function RoomLobby() {
     );
   }
 
-  if (room.connectionState === 'CONNECTING' || room.connectionState === 'AUTHENTICATING') {
+  if (room.connectionState === 'IDLE' || room.connectionState === 'CONNECTING' || room.connectionState === 'AUTHENTICATING') {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="w-8 h-8 border-2 border-hrsh-accent border-t-transparent rounded-full animate-spin mb-4" />
@@ -332,6 +333,14 @@ export default function RoomLobby() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Player Customization */}
+          {!showSettings && game && (
+            <PlayerCustomizationPanel 
+              gameId={game.id} 
+              initialCustomization={me?.customization} 
+            />
           )}
         </div>
 

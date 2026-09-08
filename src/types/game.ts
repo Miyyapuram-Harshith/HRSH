@@ -97,6 +97,9 @@ export interface GameMetadata {
   tags: string[];
   color: string; // Accent color for the game
   icon: string;  // Emoji icon
+  customizationSchema?: GameSettingDefinition[];
+  defaultCustomization?: Record<string, any>;
+  validateCustomization?: (customization: Record<string, any>) => Record<string, any>;
   component: () => Promise<{ default: React.ComponentType<GameComponentProps> }>;
 }
 

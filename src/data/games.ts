@@ -238,6 +238,12 @@ const games: GameMetadata[] = [
     color: '#10b981',
     icon: '🐍',
     settingsSchema: GAME_SCHEMAS['snake-arena'],
+    customizationSchema: [
+      { key: 'skin', type: 'select', label: 'Snake Skin', defaultValue: 'classic', options: [{ value: 'classic', label: 'Classic' }, { value: 'neon', label: 'Neon' }, { value: 'galaxy', label: 'Galaxy' }, { value: 'fire', label: 'Fire' }] },
+      { key: 'primaryColor', type: 'color', label: 'Snake Color', defaultValue: '#22c55e' },
+      { key: 'trail', type: 'select', label: 'Trail Effect', defaultValue: 'none', options: [{ value: 'none', label: 'None' }, { value: 'glow', label: 'Glow' }, { value: 'rainbow', label: 'Rainbow' }] }
+    ],
+    defaultCustomization: { skin: 'classic', primaryColor: '#22c55e', trail: 'none' },
     matchProfile: {
       progressMetric: 'survivalScore',
       liveMetric: 'score',
