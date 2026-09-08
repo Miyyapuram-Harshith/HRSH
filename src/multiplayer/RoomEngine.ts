@@ -1,16 +1,16 @@
-import { useRoomStore } from '../stores/roomStore';
+import { useRoomStore, ConnectionState } from '../stores/roomStore';
 import { usePlayerStore } from '../stores/playerStore';
-
-export type ConnectionState = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'ERROR';
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const HEARTBEAT_INTERVAL = 15000; // 15s
 const INITIAL_RECONNECT_DELAY = 1000;
+const CONNECTION_TIMEOUT = 10000; // 10s
 
 export class RoomEngine {
   private static ws: WebSocket | null = null;
   private static reconnectTimer: any = null;
   private static heartbeatTimer: any = null;
+  private static connectionTimeoutTimer: any = null;
   private static reconnectAttempts = 0;
   private static currentRoomId: string | null = null;
   private static messageQueue: any[] = [];
@@ -29,6 +29,16 @@ export class RoomEngine {
 
     const wsUrl = `${this.URL_BASE}/api/room/${roomId}?playerId=${player.id}&playerName=${encodeURIComponent(player.name || 'Anonymous')}`;
     
+    // Check if we have initial settings from CreateRoom
+    let initialSettings = null;
+    const settingsStr = sessionStorage.getItem(`hrsh_initial_settings_${roomId}`);
+    if (settingsStr) {
+      try {
+        initialSettings = JSON.parse(settingsStr);
+        sessionStorage.removeItem(`hrsh_initial_settings_${roomId}`);
+      } catch (e) {}
+    }
+
     try {
       this.ws = new WebSocket(wsUrl);
     } catch {
@@ -36,16 +46,29 @@ export class RoomEngine {
       return;
     }
 
-    this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
-      useRoomStore.getState().updateState({ connectionState: 'CONNECTED', isConnected: true, error: null });
-      
-      // Flush queued messages
-      for (const msg of this.messageQueue) {
-        this.send(msg);
+    // Connection timeout
+    if (this.connectionTimeoutTimer) clearTimeout(this.connectionTimeoutTimer);
+    this.connectionTimeoutTimer = setTimeout(() => {
+      if (useRoomStore.getState().connectionState === 'CONNECTING' || useRoomStore.getState().connectionState === 'AUTHENTICATING') {
+        useRoomStore.getState().updateState({ connectionState: 'ERROR', error: 'Connection timed out. Please try again.' });
+        if (this.ws) this.ws.close();
       }
-      this.messageQueue = [];
+    }, CONNECTION_TIMEOUT);
+
+    this.ws.onopen = () => {
+      if (this.connectionTimeoutTimer) clearTimeout(this.connectionTimeoutTimer);
+      this.reconnectAttempts = 0;
       
+      useRoomStore.getState().updateState({ connectionState: 'AUTHENTICATING', isConnected: true, error: null });
+      
+      // Explicit JOIN handshake
+      this.ws?.send(JSON.stringify({
+        type: 'ROOM_JOIN',
+        playerId: player.id,
+        playerName: player.name,
+        initialSettings
+      }));
+
       // Start heartbeat
       this.startHeartbeat();
     };
@@ -53,26 +76,45 @@ export class RoomEngine {
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        if (msg.type === 'ROOM_STATE') {
-          useRoomStore.getState().updateState(msg.state);
+        
+        if (msg.type === 'ROOM_JOINED') {
+          useRoomStore.getState().updateState({ connectionState: 'CONNECTED' });
+          // Flush queued messages after successful join
+          for (const queuedMsg of this.messageQueue) {
+            this.send(queuedMsg);
+          }
+          this.messageQueue = [];
+        } else if (msg.type === 'ROOM_STATE') {
+          useRoomStore.getState().updateState({ ...msg.state, connectionState: 'CONNECTED' });
+        } else if (msg.type === 'ERROR') {
+          useRoomStore.getState().updateState({ connectionState: 'ERROR', error: msg.message });
+          if (msg.code === 'ROOM_NOT_FOUND' || msg.code === 'ROOM_FULL' || msg.code === 'ROOM_CLOSED') {
+             // Do not reconnect for these explicit rejections
+             this.disconnect();
+          }
         } else if (msg.type === 'KICKED') {
           useRoomStore.getState().setError('You have been kicked from the room.');
           this.disconnect();
         } else if (msg.type === 'PONG') {
-          // Heartbeat response — connection is alive
+          // Heartbeat response
         }
       } catch (e) {
         console.error('WebSocket message parsing error', e);
       }
     };
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (event) => {
       this.stopHeartbeat();
+      if (this.connectionTimeoutTimer) clearTimeout(this.connectionTimeoutTimer);
+      
       useRoomStore.getState().updateState({ isConnected: false });
       
-      // Don't auto-reconnect if we were intentionally kicked
       const error = useRoomStore.getState().error;
-      if (error === 'You have been kicked from the room.') return;
+      const connectionState = useRoomStore.getState().connectionState;
+      
+      // Explicitly rejected or disconnected by user
+      if (error || connectionState === 'DISCONNECTED') return;
+      if (event.code === 4000) return; // Custom close code for explicit closure
       
       // Exponential backoff reconnect
       if (this.currentRoomId && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
@@ -87,8 +129,7 @@ export class RoomEngine {
         });
         this.reconnectTimer = setTimeout(() => this.connect(this.currentRoomId!), delay);
       } else if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        useRoomStore.getState().updateState({ connectionState: 'ERROR' });
-        useRoomStore.getState().setError('Connection lost. Please try again.');
+        useRoomStore.getState().updateState({ connectionState: 'ERROR', error: 'Connection lost. Unable to reconnect.' });
       }
     };
 
@@ -99,15 +140,23 @@ export class RoomEngine {
 
   static disconnect(silent = false) {
     this.stopHeartbeat();
+    if (this.connectionTimeoutTimer) {
+      clearTimeout(this.connectionTimeoutTimer);
+      this.connectionTimeoutTimer = null;
+    }
+    
     if (this.ws) {
-      this.ws.close();
+      this.ws.close(4000); // 4000 = normal explicit close
       this.ws = null;
     }
+    
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    
     if (!silent) {
+      useRoomStore.getState().updateState({ connectionState: 'DISCONNECTED', isConnected: false });
       this.currentRoomId = null;
       this.reconnectAttempts = 0;
       this.messageQueue = [];
@@ -117,7 +166,9 @@ export class RoomEngine {
   private static startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
-      this.send({ type: 'PING' });
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'PING' }));
+      }
     }, HEARTBEAT_INTERVAL);
   }
 
@@ -129,10 +180,10 @@ export class RoomEngine {
   }
 
   static send(msg: any) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && useRoomStore.getState().connectionState === 'CONNECTED') {
       this.ws.send(JSON.stringify(msg));
     } else {
-      // Queue message if not yet connected
+      // Queue message if not yet fully joined
       if (msg.type !== 'PING') {
         this.messageQueue.push(msg);
       }

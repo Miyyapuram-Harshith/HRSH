@@ -27,18 +27,9 @@ export default function RoomLobby() {
     };
   }, [roomId, player]);
 
-  // Apply initial settings if they were passed via navigation state (new room)
-  useEffect(() => {
-    if (room.isConnected && room.status === 'WAITING' && location.state?.initialSettings) {
-      const me = room.players.find(p => p.id === player?.id);
-      if (me?.isHost) {
-        RoomEngine.updateSettings(location.state.initialSettings);
-        // Clear state so we don't re-apply on refresh
-        navigate(`/room/${roomId}`, { replace: true, state: {} });
-      }
-    }
-  }, [room.isConnected, room.status, location.state, player?.id, roomId, navigate]);
-
+  // Room settings are now applied immediately during ROOM_JOIN via RoomEngine using sessionStorage.
+  // We no longer need to rely on location.state.
+  
   const me = room.players.find(p => p.id === player?.id);
   const isHost = me?.isHost || false;
   
@@ -68,15 +59,13 @@ export default function RoomLobby() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (room.error) {
+  if (room.connectionState === 'ERROR' || room.error) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
         <div className="text-5xl mb-4">🚪</div>
         <h1 className="text-2xl font-bold mb-2">Room Unavailable</h1>
         <p className="text-text-muted mb-8 max-w-md">
-          {room.error === 'Room Not Found' 
-            ? "We couldn't find a room with that code. It may have expired or the code might be incorrect." 
-            : room.error}
+          {room.error || "We couldn't connect to the room. It may have expired or the code might be incorrect."}
         </p>
         <div className="flex gap-4">
           <button onClick={() => navigate('/multiplayer')} className="px-6 py-3 bg-hrsh-accent text-white hover:bg-hrsh-accent-hover rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-hrsh-accent/20">
@@ -90,13 +79,26 @@ export default function RoomLobby() {
     );
   }
 
-  if (!room.isConnected || !room.settings || !game) {
+  if (room.connectionState === 'CONNECTING' || room.connectionState === 'AUTHENTICATING') {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="w-8 h-8 border-2 border-hrsh-accent border-t-transparent rounded-full animate-spin mb-4" />
-        <div className="text-sm text-text-muted">Connecting to room...</div>
+        <div className="text-sm font-medium">Connecting to room...</div>
       </div>
     );
+  }
+
+  if (room.connectionState === 'RECONNECTING') {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-8 h-8 border-2 border-status-warning border-t-transparent rounded-full animate-spin mb-4" />
+        <div className="text-sm font-medium text-status-warning">Connection lost. Reconnecting (Attempt {room.reconnectAttempts})...</div>
+      </div>
+    );
+  }
+
+  if (room.connectionState !== 'CONNECTED' || !room.settings || !game) {
+    return null; // Will show connecting state or wait until full state arrives
   }
 
   // Active game states

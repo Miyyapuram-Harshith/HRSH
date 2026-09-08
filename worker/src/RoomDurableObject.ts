@@ -83,10 +83,53 @@ export class RoomDurableObject {
   private async handleWebSocket(ws: WebSocket, playerId: string, playerName: string) {
     this.state.acceptWebSocket(ws);
 
-    const isHost = this.players.size === 0;
+    // Instead of joining immediately, we wait for ROOM_JOIN message
+    // We bind a temporary listener
+    ws.addEventListener('message', async (event) => {
+      try {
+        const msg = JSON.parse(event.data as string);
+        if (msg.type === 'ROOM_JOIN') {
+          await this.handleRoomJoin(ws, msg);
+        } else if (msg.type === 'PING') {
+          ws.send(JSON.stringify({ type: 'PONG' }));
+        } else {
+          // If already joined, process normally. 
+          // We extract playerId from the connected player if possible, or use the one from URL fallback.
+          await this.handleMessage(msg.playerId || playerId, msg);
+        }
+      } catch (err) {
+        console.error('Invalid message format', err);
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      this.handleDisconnect(playerId);
+    });
+  }
+
+  private async handleRoomJoin(ws: WebSocket, msg: any) {
+    const { playerId, playerName, initialSettings } = msg;
     
+    if (this.status === 'CLOSED') {
+      ws.send(JSON.stringify({ type: 'ERROR', code: 'ROOM_CLOSED', message: 'This room is closed.' }));
+      return;
+    }
+
+    // Check if player is already in room (reconnect)
+    const existingPlayer = this.players.get(playerId);
+    if (existingPlayer) {
+      existingPlayer.ws = ws;
+      existingPlayer.name = playerName || existingPlayer.name;
+      ws.send(JSON.stringify({ type: 'ROOM_JOINED' }));
+      this.broadcastState();
+      return;
+    }
+
+    const isHost = this.players.size === 0;
+
     if (!this.settings) {
-      this.settings = {
+      // If this is the first player and initialSettings are provided, use them
+      const baseSettings: RoomSettings = {
         gameId: 'tic-tac-toe',
         mode: 'casual',
         maxPlayers: 2,
@@ -98,16 +141,31 @@ export class RoomDurableObject {
         rematchSameRoom: true,
         gameSettings: {}
       };
+
+      this.settings = { ...baseSettings, ...initialSettings };
       
-      const schema = GAME_SCHEMAS['tic-tac-toe'];
-      if (schema) {
-        schema.forEach(s => {
-          this.settings!.gameSettings![s.key] = s.defaultValue;
-        });
+      // Ensure defaults exist for gameSettings based on schema
+      if (this.settings?.gameId) {
+        const schema = GAME_SCHEMAS[this.settings.gameId];
+        if (schema) {
+          if (!this.settings.gameSettings) this.settings.gameSettings = {};
+          schema.forEach(s => {
+            if (this.settings!.gameSettings![s.key] === undefined) {
+              this.settings!.gameSettings![s.key] = s.defaultValue;
+            }
+          });
+        }
       }
     }
 
-    const isFull = Array.from(this.players.values()).filter(p => !p.isSpectator).length >= this.settings.maxPlayers;
+    const activePlayersCount = Array.from(this.players.values()).filter(p => !p.isSpectator).length;
+    const isFull = activePlayersCount >= this.settings.maxPlayers;
+    
+    if (isFull && !this.settings.spectatorsAllowed) {
+      ws.send(JSON.stringify({ type: 'ERROR', code: 'ROOM_FULL', message: 'Room is full.' }));
+      return;
+    }
+
     const isSpectator = isFull;
 
     const player: Player = {
@@ -123,21 +181,10 @@ export class RoomDurableObject {
     };
 
     this.players.set(playerId, player);
+    
+    ws.send(JSON.stringify({ type: 'ROOM_JOINED' }));
     this.broadcastState();
     this.updateLiveIndex();
-
-    ws.addEventListener('message', async (event) => {
-      try {
-        const msg = JSON.parse(event.data as string);
-        await this.handleMessage(playerId, msg);
-      } catch (err) {
-        console.error('Invalid message format', err);
-      }
-    });
-
-    ws.addEventListener('close', () => {
-      this.handleDisconnect(playerId);
-    });
   }
 
   private async handleMessage(playerId: string, msg: any) {

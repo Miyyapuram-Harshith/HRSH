@@ -16,23 +16,28 @@ export interface RoomSettings {
   gameId: string;
   mode: string;
   maxPlayers: number;
-  visibility: 'private' | 'public';
+  visibility: 'private' | 'public' | 'unlisted';
   roomName: string;
   spectatorsAllowed: boolean;
   autoStartWhenFull: boolean;
   countdownSeconds: number;
   rematchSameRoom: boolean;
+  gameSettings?: Record<string, any>;
 }
+
+export type ConnectionState = 'IDLE' | 'CONNECTING' | 'LOADING_ROOM' | 'AUTHENTICATING' | 'CONNECTED' | 'JOINED' | 'READY' | 'STARTING' | 'PLAYING' | 'FINISHING' | 'RESULTS' | 'RECONNECTING' | 'DISCONNECTED' | 'ROOM_FULL' | 'ROOM_CLOSED' | 'ROOM_NOT_FOUND' | 'ERROR';
+
+export type RoomStatus = 'WAITING' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISHING' | 'RESULTS' | 'CLOSED';
 
 interface RoomState {
   roomId: string | null;
-  status: 'WAITING' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISHING' | 'RESULTS' | 'CLOSED';
+  status: RoomStatus;
   settings: RoomSettings | null;
   players: PlayerInfo[];
   gameState: any;
   countdown: number;
   isConnected: boolean;
-  connectionState: 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'ERROR';
+  connectionState: ConnectionState;
   reconnectAttempts: number;
   error: string | null;
 
@@ -49,7 +54,7 @@ export const useRoomStore = create<RoomState>((set) => ({
   gameState: null,
   countdown: 0,
   isConnected: false,
-  connectionState: 'DISCONNECTED',
+  connectionState: 'IDLE',
   reconnectAttempts: 0,
   error: null,
 
@@ -63,7 +68,7 @@ export const useRoomStore = create<RoomState>((set) => ({
     gameState: null,
     countdown: 0,
     isConnected: false,
-    connectionState: 'DISCONNECTED',
+    connectionState: 'IDLE',
     reconnectAttempts: 0,
     error: null
   })

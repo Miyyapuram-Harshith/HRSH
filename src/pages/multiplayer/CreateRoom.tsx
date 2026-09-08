@@ -23,10 +23,12 @@ export default function CreateRoom() {
       if (!res.ok) throw new Error('Failed to create room');
       const data = await res.json();
       
-      // Navigate to the lobby where settings will be applied by host
-      // Since it's a new room, we will just navigate there and the room DO will init
-      // We will pass the initial settings in state so the lobby can apply them immediately
-      navigate(`/room/${data.roomId}`, { state: { initialSettings: settings } });
+      // Navigate to the lobby. We pass the settings in localStorage so that 
+      // when the room connects, the host can immediately apply them.
+      // We don't rely on location.state because a refresh would lose it.
+      sessionStorage.setItem(`hrsh_initial_settings_${data.roomId}`, JSON.stringify(settings));
+      
+      navigate(`/room/${data.roomId}`);
     } catch (err) {
       console.error(err);
       setError('Could not connect to multiplayer server.');
