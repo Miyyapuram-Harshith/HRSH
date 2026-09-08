@@ -95,6 +95,22 @@ export class RoomEngine {
         } else if (msg.type === 'KICKED') {
           useRoomStore.getState().setError('You have been kicked from the room.');
           this.disconnect();
+        } else if (msg.type === 'MATCH_PROGRESS_UPDATE') {
+          // Parse compact array: [id, progress, liveValue, rank, finished]
+          const updatedPlayers = useRoomStore.getState().players.map(p => {
+            const update = msg.leaderboard.find((l: any[]) => l[0] === p.id);
+            if (update) {
+              return {
+                ...p,
+                progress: update[1],
+                liveMetricValue: update[2],
+                rank: update[3],
+                finished: update[4] === 1
+              };
+            }
+            return p;
+          });
+          useRoomStore.getState().updateState({ players: updatedPlayers });
         } else if (msg.type === 'PONG') {
           // Heartbeat response
         }

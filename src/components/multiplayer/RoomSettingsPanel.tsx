@@ -60,8 +60,11 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
     switch (schema.type) {
       case 'select':
         return (
-          <div key={schema.key}>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">{schema.label}</label>
+          <div key={schema.key} className="flex justify-between items-center bg-surface-base p-3 rounded-xl border border-border-default">
+            <div>
+              <div className="font-semibold text-sm text-text-primary">{schema.label}</div>
+              {schema.description && <div className="text-[10px] text-text-muted mt-0.5">{schema.description}</div>}
+            </div>
             <select
               value={value}
               onChange={(e) => {
@@ -69,7 +72,7 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
                 if (opt) handleChange(opt.value);
                 else handleChange(e.target.value);
               }}
-              className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-hrsh-accent"
+              className="bg-surface-raised border border-border-default rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-hrsh-accent min-w-[120px]"
             >
               {schema.options?.map(opt => (
                 <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
@@ -78,9 +81,13 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
           </div>
         );
       case 'slider':
+      case 'number':
         return (
-          <div key={schema.key}>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">{schema.label}</label>
+          <div key={schema.key} className="bg-surface-base p-4 rounded-xl border border-border-default">
+            <div className="flex justify-between items-center mb-3">
+              <div className="font-semibold text-sm text-text-primary">{schema.label}</div>
+              <div className="text-sm font-bold text-hrsh-accent">{value}</div>
+            </div>
             <input
               type="range"
               min={schema.min}
@@ -90,8 +97,22 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
               onChange={(e) => handleChange(Number(e.target.value))}
               className="w-full accent-hrsh-accent"
             />
-            <div className="text-center text-sm font-medium mt-1">{value}</div>
           </div>
+        );
+      case 'toggle':
+        return (
+          <label key={schema.key} className="flex justify-between items-center bg-surface-base p-4 rounded-xl border border-border-default cursor-pointer">
+            <div>
+              <div className="font-semibold text-sm text-text-primary">{schema.label}</div>
+              {schema.description && <div className="text-[10px] text-text-muted mt-0.5">{schema.description}</div>}
+            </div>
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={(e) => handleChange(e.target.checked)}
+              className="w-5 h-5 rounded border-border-default text-hrsh-accent focus:ring-hrsh-accent bg-surface-raised"
+            />
+          </label>
         );
       default:
         return null;
@@ -102,17 +123,19 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      
+      {/* SECTION 1: GAME & ROOM NAME */}
       <div className="space-y-4">
         {mode === 'create' && (
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Game</label>
+          <div className="bg-surface-overlay border border-border-default rounded-2xl p-4 space-y-4">
+            <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Game</h3>
             <select
               value={gameId}
               onChange={(e) => {
                 setGameId(e.target.value);
                 const g = GameRegistry.get(e.target.value);
                 if (g) {
-                  setMaxPlayers(g.maxPlayers || 2);
+                  setMaxPlayers(g.defaultMaxPlayers || g.maxPlayers || 2);
                   setGameMode(g.modes[0]?.id || 'classic');
                   const defaultSettings: Record<string, any> = {};
                   g.settingsSchema?.forEach(schema => {
@@ -121,28 +144,43 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
                   setGameSettings(defaultSettings);
                 }
               }}
-              className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-hrsh-accent"
+              className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 text-base font-semibold focus:outline-none focus:border-hrsh-accent"
             >
               {multiplayerGames.map(g => (
-                <option key={g.id} value={g.id}>{g.title}</option>
+                <option key={g.id} value={g.id}>{g.icon} {g.title}</option>
               ))}
             </select>
+
+            <div>
+              <input
+                type="text"
+                value={roomName}
+                onChange={(e) => setRoomName(e.target.value)}
+                placeholder="Room Name"
+                maxLength={32}
+                className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-hrsh-accent"
+              />
+            </div>
           </div>
         )}
+      </div>
 
+      {/* SECTION 2: MODE & PLAYERS */}
+      <div className="bg-surface-overlay border border-border-default rounded-2xl p-4 space-y-4">
+        <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Mode & Players</h3>
+        
         {selectedGame.modes.length > 1 && (
           <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Mode</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 p-1 bg-surface-base border border-border-default rounded-xl">
               {selectedGame.modes.map((m) => (
                 <button
                   type="button"
                   key={m.id}
                   onClick={() => setGameMode(m.id)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
                     gameMode === m.id
-                      ? 'bg-hrsh-accent text-white border-hrsh-accent'
-                      : 'bg-surface-base text-text-secondary border-border-default hover:border-border-accent'
+                      ? 'bg-hrsh-accent text-white shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   {m.label}
@@ -153,8 +191,11 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
         )}
 
         {(selectedGame.maxPlayers || 2) > (selectedGame.minPlayers || 2) && (
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Max Players</label>
+          <div className="pt-2">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-semibold">Max Players</span>
+              <span className="text-sm font-bold text-hrsh-accent bg-hrsh-accent/10 px-2 py-0.5 rounded-md">{maxPlayers}</span>
+            </div>
             <input
               type="range"
               min={Math.max(selectedGame.minPlayers || 2, playerCount)}
@@ -163,89 +204,69 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
               onChange={(e) => setMaxPlayers(parseInt(e.target.value))}
               className="w-full accent-hrsh-accent"
             />
-            <div className="text-center text-sm font-medium mt-1">{maxPlayers} Players</div>
           </div>
         )}
+      </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Visibility</label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setVisibility('private')}
-              className={`p-3 rounded-xl border text-sm text-center transition-colors ${
-                visibility === 'private'
-                  ? 'bg-surface-raised border-hrsh-accent text-text-primary'
-                  : 'bg-surface-base border-border-default text-text-muted hover:border-border-accent'
-              }`}
-            >
-              <div className="font-semibold mb-0.5">Private</div>
-              <div className="text-[10px]">Invite link only</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setVisibility('public')}
-              className={`p-3 rounded-xl border text-sm text-center transition-colors ${
-                visibility === 'public'
-                  ? 'bg-surface-raised border-hrsh-accent text-text-primary'
-                  : 'bg-surface-base border-border-default text-text-muted hover:border-border-accent'
-              }`}
-            >
-              <div className="font-semibold mb-0.5">Public</div>
-              <div className="text-[10px]">Listed on HRSH Live</div>
-            </button>
-          </div>
-        </div>
+      {/* SECTION 3: PRIVACY & RULES */}
+      <div className="bg-surface-overlay border border-border-default rounded-2xl p-4 space-y-4">
+        <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Privacy & Rules</h3>
         
-        {mode === 'create' && (
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Room Name</label>
-            <input
-              type="text"
-              value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
-              placeholder="e.g. Friendly Match"
-              maxLength={32}
-              className="w-full bg-surface-base border border-border-default rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-hrsh-accent"
-            />
-          </div>
-        )}
+        <div className="grid grid-cols-3 gap-2">
+          {['private', 'unlisted', 'public'].map(vis => (
+            <button
+              key={vis}
+              type="button"
+              onClick={() => setVisibility(vis as any)}
+              className={`p-2 rounded-xl border text-center transition-all ${
+                visibility === vis
+                  ? 'bg-surface-raised border-hrsh-accent text-hrsh-accent shadow-sm'
+                  : 'bg-surface-base border-border-default text-text-muted hover:border-border-accent'
+              }`}
+            >
+              <div className="text-xs font-bold uppercase">{vis}</div>
+            </button>
+          ))}
+        </div>
 
-        {/* Dynamic Game Settings */}
-        {selectedGame.settingsSchema && selectedGame.settingsSchema.length > 0 && (
-          <div className="border-t border-border-default pt-4 space-y-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-text-secondary mb-2">Advanced Game Settings</h3>
+        <div className="space-y-2 pt-2">
+          <label className="flex justify-between items-center bg-surface-base p-3 rounded-xl border border-border-default cursor-pointer hover:border-hrsh-accent/50 transition-colors">
+            <span className="text-sm font-semibold text-text-primary">Allow Spectators</span>
+            <input
+              type="checkbox"
+              checked={spectatorsAllowed}
+              onChange={(e) => setSpectatorsAllowed(e.target.checked)}
+              className="w-5 h-5 rounded border-border-default text-hrsh-accent focus:ring-hrsh-accent bg-surface-raised"
+            />
+          </label>
+          
+          <label className="flex justify-between items-center bg-surface-base p-3 rounded-xl border border-border-default cursor-pointer hover:border-hrsh-accent/50 transition-colors">
+            <span className="text-sm font-semibold text-text-primary">Auto-start when full</span>
+            <input
+              type="checkbox"
+              checked={autoStart}
+              onChange={(e) => setAutoStart(e.target.checked)}
+              className="w-5 h-5 rounded border-border-default text-hrsh-accent focus:ring-hrsh-accent bg-surface-raised"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* SECTION 4: GAME SETTINGS */}
+      {selectedGame.settingsSchema && selectedGame.settingsSchema.length > 0 && (
+        <div className="bg-surface-overlay border border-border-default rounded-2xl p-4 space-y-4">
+          <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Game Settings</h3>
+          <div className="space-y-3">
             {selectedGame.settingsSchema.map(schema => renderGameSetting(schema))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="border-t border-border-default pt-6 space-y-4">
-        <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            checked={spectatorsAllowed}
-            onChange={(e) => setSpectatorsAllowed(e.target.checked)}
-            className="w-4 h-4 rounded border-border-default text-hrsh-accent focus:ring-hrsh-accent bg-surface-base"
-          />
-          <span className="text-sm">Allow Spectators</span>
-        </label>
-        
-        <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            checked={autoStart}
-            onChange={(e) => setAutoStart(e.target.checked)}
-            className="w-4 h-4 rounded border-border-default text-hrsh-accent focus:ring-hrsh-accent bg-surface-base"
-          />
-          <span className="text-sm">Auto-start when full</span>
-        </label>
-      </div>
-
-      <div className="flex gap-3 pt-4">
+      {/* ACTION BUTTONS */}
+      <div className="flex gap-3 pt-2">
         <button
           type="submit"
-          className="flex-1 py-3.5 bg-hrsh-accent hover:bg-hrsh-accent-hover text-white font-semibold rounded-xl text-sm transition-all"
+          className="flex-1 py-4 bg-hrsh-accent hover:bg-hrsh-accent-hover text-white font-bold rounded-2xl text-base transition-all shadow-lg shadow-hrsh-accent/20 active:scale-[0.98]"
         >
           {mode === 'create' ? 'Create Room' : 'Save Changes'}
         </button>
@@ -253,7 +274,7 @@ export function RoomSettingsPanel({ mode, initialSettings, onSubmit, onCancel, p
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-3.5 bg-surface-base border border-border-default hover:bg-surface-raised font-semibold rounded-xl text-sm transition-all"
+            className="px-6 py-4 bg-surface-base border border-border-default hover:bg-surface-raised font-bold rounded-2xl text-base transition-all active:scale-[0.98]"
           >
             Cancel
           </button>

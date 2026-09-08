@@ -1,0 +1,111 @@
+import { useRoomStore } from '../../stores/roomStore';
+import { usePlayerStore } from '../../stores/playerStore';
+import { RoomEngine } from '../../multiplayer/RoomEngine';
+import { Confetti } from '../shared/LoadingStates';
+import { useMemo } from 'react';
+
+export function MultiplayerResultScreen({ game }: { game: any }) {
+  const room = useRoomStore();
+  const { player } = usePlayerStore();
+  
+  const me = room.players.find(p => p.id === player?.id);
+  const isHost = me?.isHost || false;
+  
+  const sortedPlayers = useMemo(() => {
+    // If turn-based, winner is in gameState.winner
+    if (room.gameState?.winner) {
+      return [...room.players].filter(p => !p.isSpectator).sort((a, b) => {
+        if (a.id === room.gameState.winner) return -1;
+        if (b.id === room.gameState.winner) return 1;
+        return 0;
+      });
+    }
+    
+    // If progress-based (typing race, snake arena)
+    return [...room.players]
+      .filter(p => !p.isSpectator)
+      .sort((a, b) => {
+        if (a.rank && b.rank) return a.rank - b.rank;
+        return (b.progress || 0) - (a.progress || 0);
+      });
+  }, [room.players, room.gameState?.winner]);
+
+  const didIWin = sortedPlayers[0]?.id === player?.id && !room.gameState?.isDraw;
+  const isDraw = room.gameState?.isDraw;
+
+  return (
+    <>
+      <Confetti active={didIWin} />
+      <div className="absolute inset-0 z-40 bg-surface-base/80 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-[fade-in_0.3s_ease-out]">
+        <div className="w-full max-w-md bg-surface-raised border border-border-default rounded-2xl p-6 shadow-2xl animate-[scale-in_0.4s_ease-out]">
+          
+          <div className="text-center mb-8">
+            <div className="text-5xl mb-3 animate-[bounce-in_0.5s_ease-out]">
+              {isDraw ? '🤝' : (didIWin ? '🏆' : '👏')}
+            </div>
+            <h2 className="text-3xl font-bold text-text-primary tracking-tight">
+              {isDraw ? 'It\'s a Draw!' : (didIWin ? 'Victory!' : 'Match Finished')}
+            </h2>
+            {!isDraw && sortedPlayers[0] && !didIWin && (
+              <p className="text-text-muted mt-1">{sortedPlayers[0].name} won the match</p>
+            )}
+          </div>
+
+          <div className="space-y-3 mb-8">
+            {sortedPlayers.map((p, idx) => {
+              const isMe = p.id === player?.id;
+              let medal = '';
+              if (idx === 0) medal = '🥇';
+              else if (idx === 1) medal = '🥈';
+              else if (idx === 2) medal = '🥉';
+
+              return (
+                <div 
+                  key={p.id} 
+                  className={`flex items-center justify-between p-4 rounded-xl border ${
+                    isMe 
+                      ? 'bg-hrsh-accent/10 border-hrsh-accent text-text-primary' 
+                      : 'bg-surface-base border-border-default text-text-secondary'
+                  }`}
+                  style={{ animation: `slide-up 0.4s ease-out ${idx * 0.1}s both` }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl w-6 text-center">{medal || `#${idx + 1}`}</span>
+                    <span className="font-semibold text-lg">{p.name} {isMe && '(You)'}</span>
+                  </div>
+                  <div className="font-mono font-bold text-lg" style={{ color: game.color }}>
+                    {p.liveMetricValue ? p.liveMetricValue.toLocaleString() : (p.progress ? `${Math.round(p.progress)}%` : '')}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {isHost ? (
+            <div className="flex gap-3">
+              <button 
+                onClick={() => RoomEngine.rematch()} 
+                className="flex-1 py-4 bg-hrsh-accent text-white font-bold rounded-xl shadow-lg hover:bg-hrsh-accent-hover transition-colors active:scale-[0.98]"
+              >
+                Play Again
+              </button>
+              <button 
+                onClick={() => {
+                  RoomEngine.updateSettings({}); // Or whatever returns to lobby without resetting
+                  // For now rematch returns to lobby implicitly in DO
+                }} 
+                className="flex-1 py-4 bg-surface-base border border-border-default hover:bg-surface-raised font-bold rounded-xl transition-colors active:scale-[0.98]"
+              >
+                Lobby Settings
+              </button>
+            </div>
+          ) : (
+            <div className="text-center p-4 bg-surface-base rounded-xl border border-border-default animate-pulse">
+              <p className="text-sm font-semibold text-text-muted">Waiting for host to choose next action...</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

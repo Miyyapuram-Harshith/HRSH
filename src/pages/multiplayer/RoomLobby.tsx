@@ -7,6 +7,7 @@ import { GameRegistry } from '../../engine/GameRegistry';
 import { getGameComponent } from '../../utils/gameCache';
 import { RoomSettingsPanel } from '../../components/multiplayer/RoomSettingsPanel';
 import { PlayerCard } from '../../components/ui/PlayerCard';
+import { MultiplayerResultScreen } from './MultiplayerResultScreen';
 
 export default function RoomLobby() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -113,11 +114,8 @@ export default function RoomLobby() {
           </div>
         )}
         
-        {room.status === 'RESULTS' && isHost && (
-          <div className="absolute top-20 right-4 z-40 bg-surface-raised border border-border-default p-4 rounded-xl shadow-xl flex flex-col gap-2">
-            <div className="text-sm font-semibold mb-2">Host Options</div>
-            <button onClick={() => RoomEngine.rematch()} className="px-4 py-2 bg-hrsh-accent text-white rounded-lg text-sm">Rematch in Lobby</button>
-          </div>
+        {room.status === 'RESULTS' && (
+          <MultiplayerResultScreen game={game} />
         )}
 
         <div className="bg-surface-raised border border-border-default rounded-2xl overflow-hidden shadow-2xl relative min-h-[600px]">
