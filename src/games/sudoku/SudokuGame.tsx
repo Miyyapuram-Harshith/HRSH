@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { usePlayerStore } from '../../stores/playerStore';
 import type { GameComponentProps, GameResult } from '../../types/game';
 
 // ============================================================
@@ -67,6 +68,11 @@ function generateSudoku(difficulty: 'easy' | 'medium' | 'hard'): { puzzle: Sudok
 }
 
 function SudokuGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameComponentProps) {
+  const { settings } = usePlayerStore();
+  const customization = (settings as any)?.customizations?.['sudoku'] || {};
+  const primaryColor = customization.primaryColor || '#0ea5e9';
+  const matchingHighlight = customization.matchingHighlight !== false;
+  const errorHighlight = customization.errorHighlight !== false;
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [puzzle, setPuzzle] = useState<SudokuBoard | null>(null);
   const [solution, setSolution] = useState<SudokuBoard | null>(null);
@@ -260,9 +266,12 @@ function SudokuGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameCom
                     transition-colors select-none
                     ${c % 3 === 2 && c < 8 ? 'border-r-2 border-r-text-primary' : 'border-r border-r-border-default'}
                     ${r % 3 === 2 && r < 8 ? 'border-b-2 border-b-text-primary' : 'border-b border-b-border-default'}
-                    ${isSelected ? 'bg-hrsh-accent/20' : isSameNumber ? 'bg-hrsh-accent/10' : 'bg-surface-raised hover:bg-surface-overlay'}
-                    ${isError ? 'text-red-400' : isOriginal ? 'text-text-primary font-bold' : 'text-sky-400'}
+                    ${isSelected ? 'text-white' : isSameNumber && matchingHighlight ? 'bg-surface-hover' : 'bg-surface-raised hover:bg-surface-overlay'}
+                    ${isError && errorHighlight ? 'text-red-400 bg-red-950/30' : isOriginal ? 'text-text-primary font-bold' : 'text-sky-400'}
                   `}
+                  style={{
+                    backgroundColor: isSelected ? primaryColor : undefined
+                  }}
                 >
                   {cell !== null ? (
                     cell

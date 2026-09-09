@@ -7,7 +7,16 @@
 
 import { GameRegistry } from '../engine/GameRegistry';
 import type { GameMetadata } from '../types/game';
-import { GAME_SCHEMAS } from './gameSchemas';
+import {
+  GAME_SCHEMAS,
+  GAME_CUSTOMIZATION_SCHEMAS,
+  defaultSnakeCustomization,
+  defaultTwenty48Customization,
+  defaultReactionCustomization,
+  defaultMinesweeperCustomization,
+  defaultSudokuCustomization,
+  defaultTypingCustomization
+} from './gameSchemas';
 
 const games: GameMetadata[] = [
   // ---- SOLO ----
@@ -27,6 +36,8 @@ const games: GameMetadata[] = [
     color: '#22c55e',
     icon: '🐍',
     settingsSchema: GAME_SCHEMAS['snake'],
+    customizationSchema: GAME_CUSTOMIZATION_SCHEMAS['snake'],
+    defaultCustomization: defaultSnakeCustomization,
     component: () => import('../games/snake/SnakeGame'),
   },
   {
@@ -45,6 +56,8 @@ const games: GameMetadata[] = [
     color: '#f59e0b',
     icon: '🧮',
     settingsSchema: GAME_SCHEMAS['2048'],
+    customizationSchema: GAME_CUSTOMIZATION_SCHEMAS['2048'],
+    defaultCustomization: defaultTwenty48Customization,
     component: () => import('../games/twenty48/Twenty48Game'),
   },
   {
@@ -63,6 +76,8 @@ const games: GameMetadata[] = [
     color: '#ef4444',
     icon: '⚡',
     settingsSchema: GAME_SCHEMAS['reaction-test'],
+    customizationSchema: GAME_CUSTOMIZATION_SCHEMAS['reaction'],
+    defaultCustomization: defaultReactionCustomization,
     component: () => import('../games/reaction/ReactionGame'),
   },
   {
@@ -86,6 +101,8 @@ const games: GameMetadata[] = [
     color: '#6366f1',
     icon: '💣',
     settingsSchema: GAME_SCHEMAS['minesweeper'],
+    customizationSchema: GAME_CUSTOMIZATION_SCHEMAS['minesweeper'],
+    defaultCustomization: defaultMinesweeperCustomization,
     component: () => import('../games/minesweeper/MinesweeperGame'),
   },
   {
@@ -109,6 +126,8 @@ const games: GameMetadata[] = [
     color: '#0ea5e9',
     icon: '🔢',
     settingsSchema: GAME_SCHEMAS['sudoku'],
+    customizationSchema: GAME_CUSTOMIZATION_SCHEMAS['sudoku'],
+    defaultCustomization: defaultSudokuCustomization,
     component: () => import('../games/sudoku/SudokuGame'),
   },
   {
@@ -131,6 +150,8 @@ const games: GameMetadata[] = [
     color: '#8b5cf6',
     icon: '⌨️',
     settingsSchema: GAME_SCHEMAS['typing-test'],
+    customizationSchema: GAME_CUSTOMIZATION_SCHEMAS['typing'],
+    defaultCustomization: defaultTypingCustomization,
     matchProfile: {
       progressMetric: 'textCompletion',
       liveMetric: 'wpm',
@@ -238,12 +259,8 @@ const games: GameMetadata[] = [
     color: '#10b981',
     icon: '🐍',
     settingsSchema: GAME_SCHEMAS['snake-arena'],
-    customizationSchema: [
-      { key: 'skin', type: 'select', label: 'Snake Skin', defaultValue: 'classic', options: [{ value: 'classic', label: 'Classic' }, { value: 'neon', label: 'Neon' }, { value: 'galaxy', label: 'Galaxy' }, { value: 'fire', label: 'Fire' }] },
-      { key: 'primaryColor', type: 'color', label: 'Snake Color', defaultValue: '#22c55e' },
-      { key: 'trail', type: 'select', label: 'Trail Effect', defaultValue: 'none', options: [{ value: 'none', label: 'None' }, { value: 'glow', label: 'Glow' }, { value: 'rainbow', label: 'Rainbow' }] }
-    ],
-    defaultCustomization: { skin: 'classic', primaryColor: '#22c55e', trail: 'none' },
+    customizationSchema: GAME_CUSTOMIZATION_SCHEMAS['snake-arena'],
+    defaultCustomization: defaultSnakeCustomization,
     matchProfile: {
       progressMetric: 'survivalScore',
       liveMetric: 'score',

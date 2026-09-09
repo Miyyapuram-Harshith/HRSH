@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { usePlayerStore } from '../../stores/playerStore';
 import type { GameComponentProps, GameResult } from '../../types/game';
 
 // ============================================================
@@ -10,6 +11,12 @@ type Phase = 'waiting' | 'ready' | 'go' | 'result' | 'too-early' | 'finished';
 const ROUNDS = 5;
 
 function ReactionGame({ onGameStart, onGameEnd, onScoreUpdate }: GameComponentProps) {
+  const { settings } = usePlayerStore();
+  const customization = (settings as any)?.customizations?.['reaction'] || {};
+  const theme = customization.theme || 'classic';
+  const targetStyle = customization.targetStyle || 'fullscreen';
+  const primaryColor = customization.primaryColor || '#ef4444';
+
   const [phase, setPhase] = useState<Phase>('waiting');
   const [times, setTimes] = useState<number[]>([]);
   const [currentTime, setCurrentTime] = useState<number | null>(null);
@@ -94,21 +101,24 @@ function ReactionGame({ onGameStart, onGameEnd, onScoreUpdate }: GameComponentPr
   }, [phase, times, round, startRound, onGameStart, onGameEnd, onScoreUpdate]);
 
   const getPhaseConfig = () => {
+    const readyBg = theme === 'cyber' ? '#ec4899' : theme === 'sunset' ? '#f97316' : primaryColor || '#dc2626';
+    const goBg = theme === 'cyber' ? '#06b6d4' : theme === 'sunset' ? '#eab308' : '#16a34a';
+
     switch (phase) {
       case 'waiting':
-        return { bg: 'bg-surface-raised', text: 'Click to Start', sub: `${ROUNDS} rounds — react when the screen turns green`, color: 'text-text-primary' };
+        return { bgStyle: {}, bgClass: 'bg-surface-raised', text: 'Click to Start', sub: `${ROUNDS} rounds — react when it changes!`, color: 'text-text-primary' };
       case 'ready':
-        return { bg: 'bg-red-600', text: 'Wait...', sub: 'Click when it turns green', color: 'text-white' };
+        return { bgStyle: { backgroundColor: readyBg }, bgClass: '', text: 'Wait...', sub: 'Click when it triggers!', color: 'text-white' };
       case 'go':
-        return { bg: 'bg-green-600', text: 'Click Now!', sub: '', color: 'text-white' };
+        return { bgStyle: { backgroundColor: goBg }, bgClass: '', text: targetStyle === 'bolt' ? '⚡ CLICK NOW! ⚡' : targetStyle === 'circle' ? '🎯 HIT TARGET!' : 'Click Now!', sub: '', color: 'text-white' };
       case 'too-early':
-        return { bg: 'bg-surface-raised', text: 'Too Early!', sub: 'Click to try again', color: 'text-red-400' };
+        return { bgStyle: {}, bgClass: 'bg-surface-raised', text: 'Too Early!', sub: 'Click to try again', color: 'text-red-400' };
       case 'result':
-        return { bg: 'bg-surface-raised', text: `${currentTime}ms`, sub: `Round ${round}/${ROUNDS} — Click to continue`, color: 'text-hrsh-accent' };
+        return { bgStyle: {}, bgClass: 'bg-surface-raised', text: `${currentTime}ms`, sub: `Round ${round}/${ROUNDS} — Click to continue`, color: 'text-hrsh-accent' };
       case 'finished':
-        return { bg: 'bg-surface-raised', text: 'Done!', sub: '', color: 'text-text-primary' };
+        return { bgStyle: {}, bgClass: 'bg-surface-raised', text: 'Done!', sub: '', color: 'text-text-primary' };
       default:
-        return { bg: 'bg-surface-raised', text: '', sub: '', color: '' };
+        return { bgStyle: {}, bgClass: 'bg-surface-raised', text: '', sub: '', color: '' };
     }
   };
 
@@ -132,9 +142,12 @@ function ReactionGame({ onGameStart, onGameEnd, onScoreUpdate }: GameComponentPr
       {/* Main interaction area */}
       <button
         onClick={handleClick}
-        className={`w-full aspect-[4/3] max-w-lg mx-auto rounded-xl ${config.bg} flex flex-col items-center justify-center cursor-pointer transition-colors duration-100 select-none border border-border-default`}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
+        className={`w-full aspect-[4/3] max-w-lg mx-auto rounded-2xl ${config.bgClass} flex flex-col items-center justify-center cursor-pointer transition-colors duration-100 select-none border border-border-default shadow-lg`}
+        style={{ ...config.bgStyle, WebkitTapHighlightColor: 'transparent' }}
       >
+        {targetStyle === 'circle' && (phase === 'ready' || phase === 'go') && (
+          <div className="w-24 h-24 rounded-full border-4 border-white/50 flex items-center justify-center mb-2 animate-ping" />
+        )}
         <div className={`text-3xl sm:text-4xl font-bold font-mono ${config.color} transition-all`}>
           {config.text}
         </div>

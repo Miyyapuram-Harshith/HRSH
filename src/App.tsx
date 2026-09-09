@@ -1,5 +1,5 @@
 import { useEffect, Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { usePlayerStore } from './stores/playerStore';
 import { AppShell } from './components/layout/AppShell';
 import { Onboarding } from './components/shared/Onboarding';
@@ -35,53 +35,58 @@ function PageLoader() {
 }
 
 export default function App() {
-  const { initialize, showOnboarding, isLoading } = usePlayerStore();
+  const { initialize, showOnboarding, isLoading, setPendingDestination } = usePlayerStore();
+  const location = useLocation();
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-surface-base">
-        <div className="flex flex-col items-center gap-4 animate-[fade-in_0.3s_ease-out]">
-          <h1 className="text-4xl font-black tracking-tighter gradient-text">HRSH</h1>
-          <div className="w-8 h-8 border-2 border-hrsh-accent border-t-transparent rounded-full animate-spin" />
-        </div>
-      </div>
-    );
-  }
-
-  if (showOnboarding) {
-    return <Onboarding />;
-  }
+  useEffect(() => {
+    // If arriving at a specific route (like /room/XYZ) while needing onboarding, preserve it
+    if (showOnboarding && location.pathname && location.pathname !== '/') {
+      setPendingDestination(`${location.pathname}${location.search}`);
+    }
+  }, [showOnboarding, location.pathname, location.search, setPendingDestination]);
 
   return (
-    <>
-      <AppShell>
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/games" element={<Games />} />
-            <Route path="/games/:slug" element={<GamePage />} />
-            <Route path="/multiplayer" element={<Multiplayer />} />
-            <Route path="/room/create" element={<CreateRoom />} />
-            <Route path="/room/:roomId" element={<RoomLobby />} />
-            <Route path="/challenges" element={<Challenges />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/accessibility" element={<Accessibility />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          </Suspense>
-        </ErrorBoundary>
-      </AppShell>
-      <AchievementToast />
-    </>
+    <ErrorBoundary>
+      {isLoading ? (
+        <div className="flex items-center justify-center min-h-screen bg-surface-base">
+          <div className="flex flex-col items-center gap-4 animate-[fade-in_0.3s_ease-out]">
+            <h1 className="text-4xl font-black tracking-tighter gradient-text">HRSH</h1>
+            <div className="w-8 h-8 border-2 border-hrsh-accent border-t-transparent rounded-full animate-spin" />
+          </div>
+        </div>
+      ) : showOnboarding ? (
+        <Onboarding />
+      ) : (
+        <>
+          <AppShell>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/games" element={<Games />} />
+                <Route path="/games/:slug" element={<GamePage />} />
+                <Route path="/multiplayer" element={<Multiplayer />} />
+                <Route path="/room/create" element={<CreateRoom />} />
+                <Route path="/room/:roomId" element={<RoomLobby />} />
+                <Route path="/challenges" element={<Challenges />} />
+                <Route path="/leaderboard" element={<Leaderboard />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/accessibility" element={<Accessibility />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </AppShell>
+          <AchievementToast />
+        </>
+      )}
+    </ErrorBoundary>
   );
 }
+

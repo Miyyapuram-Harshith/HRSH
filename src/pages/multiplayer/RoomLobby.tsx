@@ -64,6 +64,19 @@ export default function RoomLobby() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  if (!roomId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+        <div className="text-5xl mb-4">🚪</div>
+        <h1 className="text-2xl font-bold mb-2">Invalid Room</h1>
+        <p className="text-text-muted mb-8 max-w-md">No room code was provided in the URL.</p>
+        <button onClick={() => navigate('/multiplayer')} className="px-6 py-3 bg-hrsh-accent text-white hover:bg-hrsh-accent-hover rounded-xl font-semibold text-sm transition-colors">
+          Browse Multiplayer
+        </button>
+      </div>
+    );
+  }
+
   if (room.connectionState === 'ERROR' || room.error) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
@@ -84,7 +97,7 @@ export default function RoomLobby() {
     );
   }
 
-  if (room.connectionState === 'IDLE' || room.connectionState === 'CONNECTING' || room.connectionState === 'AUTHENTICATING') {
+  if (room.connectionState === 'IDLE' || room.connectionState === 'CONNECTING' || room.connectionState === 'AUTHENTICATING' || room.connectionState === 'LOADING_ROOM') {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="w-8 h-8 border-2 border-hrsh-accent border-t-transparent rounded-full animate-spin mb-4" />
@@ -102,8 +115,13 @@ export default function RoomLobby() {
     );
   }
 
-  if (room.connectionState !== 'CONNECTED' || !room.settings || !game) {
-    return null; // Will show connecting state or wait until full state arrives
+  if (!room.settings || !game) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-8 h-8 border-2 border-hrsh-accent border-t-transparent rounded-full animate-spin mb-4" />
+        <div className="text-sm font-medium">Synchronizing room lobby...</div>
+      </div>
+    );
   }
 
   // Active game states
@@ -323,7 +341,7 @@ export default function RoomLobby() {
                 {activePlayers.map(renderPlayer)}
                 
                 {/* Empty Slots */}
-                {Array.from({ length: room.settings.maxPlayers - activePlayers.length }).map((_, i) => (
+                {Array.from({ length: Math.max(0, (room.settings?.maxPlayers || 2) - activePlayers.length) }).map((_, i) => (
                   <div key={`empty-${i}`} className="p-4 flex items-center gap-3 opacity-50">
                     <div className="w-10 h-10 rounded-full border-2 border-dashed border-border-default flex items-center justify-center text-text-muted">
                       +

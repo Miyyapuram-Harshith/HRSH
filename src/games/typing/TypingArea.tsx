@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, memo } from 'react';
+import { usePlayerStore } from '../../stores/playerStore';
 
 interface TypingAreaProps {
   challengeText: string;
@@ -19,6 +20,12 @@ export const TypingArea = memo(function TypingArea({
   started,
   onFirstKeydown
 }: TypingAreaProps) {
+  const { settings } = usePlayerStore();
+  const customization = (settings as any)?.customizations?.['typing'] || {};
+  const fontStyle = customization.fontStyle || 'mono';
+  const primaryColor = customization.primaryColor || '#8b5cf6';
+  const caretStyle = customization.caretStyle || 'line';
+
   const [typed, setTyped] = useState('');
   const [finished, setFinished] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -95,19 +102,30 @@ export const TypingArea = memo(function TypingArea({
     }
   }, [finished, isPaused, started, challengeText, onFirstKeydown, onLocalStatsUpdate, onProgressThrottled, onFinish]);
 
+  const fontClass = fontStyle === 'sans' ? 'font-sans' : fontStyle === 'serif' ? 'font-serif' : fontStyle === 'terminal' ? 'font-mono tracking-wider' : 'font-mono';
+
   // Render text with highlighting
   const renderText = () => {
     if (!challengeText) return null;
     
     return challengeText.split('').map((char, i) => {
       let className = 'text-text-muted';
+      let customStyle: React.CSSProperties = {};
+
       if (i < typed.length) {
-        className = typed[i] === char ? 'text-text-primary font-medium' : 'text-red-400 bg-red-400/20 rounded-sm';
+        className = typed[i] === char ? 'text-text-primary font-medium' : 'text-red-400 bg-red-400/20 rounded-xs';
       } else if (i === typed.length && started && !isPaused && !finished) {
-        className = 'text-text-primary bg-hrsh-accent/40 rounded-sm animate-pulse';
+        className = `text-white font-bold rounded-xs relative ${
+          caretStyle === 'block' ? 'bg-text-primary text-black' : caretStyle === 'underline' ? 'border-b-2' : 'border-l-2 animate-pulse'
+        }`;
+        customStyle = {
+          backgroundColor: caretStyle === 'block' ? primaryColor : undefined,
+          borderColor: primaryColor,
+          boxShadow: `0 0 10px ${primaryColor}`
+        };
       }
       return (
-        <span key={i} className={className}>
+        <span key={i} className={className} style={customStyle}>
           {char}
         </span>
       );
@@ -121,7 +139,7 @@ export const TypingArea = memo(function TypingArea({
       }`}
       onClick={handleAreaClick}
     >
-      <div className="font-mono text-sm sm:text-lg leading-relaxed h-32 overflow-hidden select-none whitespace-pre-wrap break-words">
+      <div className={`${fontClass} text-sm sm:text-lg leading-relaxed h-32 overflow-hidden select-none whitespace-pre-wrap break-words`}>
         {renderText()}
       </div>
 

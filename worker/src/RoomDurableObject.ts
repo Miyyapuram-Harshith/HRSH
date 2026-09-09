@@ -96,10 +96,37 @@ export class RoomDurableObject {
         // ignore
       }
       
-      this.gameId = payload.gameId || 'tic-tac-toe';
-      this.mode = payload.mode || 'classic';
-      this.settings = payload.settings || {};
-      this.gameSettings = payload.gameSettings || {};
+      const gameId = payload.gameId || payload.settings?.gameId || 'tic-tac-toe';
+      const mode = payload.mode || payload.settings?.mode || 'classic';
+      const gameSettings = payload.gameSettings || payload.settings?.gameSettings || {};
+      
+      const baseSettings: RoomSettings = {
+        gameId,
+        mode,
+        maxPlayers: payload.maxPlayers || payload.settings?.maxPlayers || 2,
+        visibility: payload.visibility || payload.settings?.visibility || 'private',
+        roomName: payload.roomName || payload.settings?.roomName || 'HRSH Room',
+        spectatorsAllowed: payload.spectatorsAllowed ?? payload.settings?.spectatorsAllowed ?? true,
+        autoStartWhenFull: payload.autoStartWhenFull ?? payload.settings?.autoStartWhenFull ?? false,
+        countdownSeconds: payload.countdownSeconds ?? payload.settings?.countdownSeconds ?? 3,
+        rematchSameRoom: payload.rematchSameRoom ?? payload.settings?.rematchSameRoom ?? true,
+        gameSettings: { ...gameSettings }
+      };
+
+      // Ensure defaults exist for gameSettings based on schema
+      const schema = GAME_SCHEMAS[gameId];
+      if (schema) {
+        schema.forEach(s => {
+          if (baseSettings.gameSettings![s.key] === undefined) {
+            baseSettings.gameSettings![s.key] = s.defaultValue;
+          }
+        });
+      }
+
+      this.gameId = gameId;
+      this.mode = mode;
+      this.settings = baseSettings;
+      this.gameSettings = baseSettings.gameSettings;
       this.roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       this.createdAt = Date.now();
       
@@ -120,7 +147,7 @@ export class RoomDurableObject {
         settings: this.settings,
         gameSettings: this.gameSettings,
         createdAt: this.createdAt
-      }), { headers: { 'Content-Type': 'application/json' } });
+      }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
     if (request.headers.get('Upgrade') === 'websocket') {
@@ -190,6 +217,9 @@ export class RoomDurableObject {
     if (existingPlayer) {
       existingPlayer.ws = ws;
       existingPlayer.name = playerName || existingPlayer.name;
+      if (msg.customization) {
+        existingPlayer.customization = { ...existingPlayer.customization, ...msg.customization };
+      }
       existingPlayer.connectionState = 'CONNECTED';
       if (existingPlayer.disconnectTimer) {
         clearTimeout(existingPlayer.disconnectTimer);
@@ -202,37 +232,43 @@ export class RoomDurableObject {
 
     const isHost = this.players.size === 0;
 
-    if (!this.settings) {
+    if (!this.settings || !this.settings.gameId) {
       // If this is the first player and initialSettings are provided, use them
+      const initSettings = initialSettings || {};
+      const gameId = initSettings.gameId || this.gameId || 'tic-tac-toe';
       const baseSettings: RoomSettings = {
-        gameId: 'tic-tac-toe',
-        mode: 'casual',
-        maxPlayers: 2,
-        visibility: 'private',
-        roomName: `${playerName}'s Room`,
-        spectatorsAllowed: true,
-        autoStartWhenFull: false,
-        countdownSeconds: 3,
-        rematchSameRoom: true,
-        gameSettings: {}
+        gameId,
+        mode: initSettings.mode || this.mode || 'classic',
+        maxPlayers: initSettings.maxPlayers || 2,
+        visibility: initSettings.visibility || 'private',
+        roomName: initSettings.roomName || `${playerName}'s Room`,
+        spectatorsAllowed: initSettings.spectatorsAllowed ?? true,
+        autoStartWhenFull: initSettings.autoStartWhenFull ?? false,
+        countdownSeconds: initSettings.countdownSeconds ?? 3,
+        rematchSameRoom: initSettings.rematchSameRoom ?? true,
+        gameSettings: initSettings.gameSettings || {}
       };
 
-      this.settings = { ...baseSettings, ...initialSettings };
+      this.settings = { ...baseSettings, ...initSettings };
+      this.gameId = this.settings.gameId;
+      this.mode = this.settings.mode;
       
       // Ensure defaults exist for gameSettings based on schema
-      if (this.settings?.gameId) {
-        const schema = GAME_SCHEMAS[this.settings.gameId];
-        if (schema) {
-          if (!this.settings.gameSettings) this.settings.gameSettings = {};
-          schema.forEach(s => {
-            if (this.settings!.gameSettings![s.key] === undefined) {
-              this.settings!.gameSettings![s.key] = s.defaultValue;
-            }
-          });
-        }
+      const schema = GAME_SCHEMAS[this.settings.gameId];
+      if (schema) {
+        if (!this.settings.gameSettings) this.settings.gameSettings = {};
+        schema.forEach(s => {
+          if (this.settings!.gameSettings![s.key] === undefined) {
+            this.settings!.gameSettings![s.key] = s.defaultValue;
+          }
+        });
       }
       
+      this.gameSettings = this.settings.gameSettings;
       this.state.storage.put('settings', this.settings);
+      this.state.storage.put('gameId', this.gameId);
+      this.state.storage.put('mode', this.mode);
+      this.state.storage.put('gameSettings', this.gameSettings);
       
       // Initialize teams if needed
       if (this.settings.gameSettings?.teamMode || this.settings.gameSettings?.teams) {
@@ -711,6 +747,7 @@ export class RoomDurableObject {
       isSpectator: p.isSpectator,
       connectionState: p.connectionState,
       teamId: p.teamId,
+      customization: p.customization || {},
       progress: p.progress,
       liveMetricValue: p.liveMetricValue,
       rank: p.rank,

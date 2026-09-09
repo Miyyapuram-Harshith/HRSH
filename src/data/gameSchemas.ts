@@ -1,5 +1,170 @@
 import type { GameSettingDefinition } from '../types/game';
 
+// -------------------------------------------------------------
+// PLAYER CUSTOMIZATION SCHEMAS (Visuals / Themes / Aesthetics)
+// -------------------------------------------------------------
+
+export const snakeCustomizationSchema: GameSettingDefinition[] = [
+  { key: 'skin', type: 'select', label: 'Snake Skin', defaultValue: 'classic', options: [
+    { value: 'classic', label: 'Classic' },
+    { value: 'neon', label: 'Neon Glow' },
+    { value: 'galaxy', label: 'Galaxy' },
+    { value: 'fire', label: 'Fire & Ember' },
+    { value: 'emerald', label: 'Emerald Dragon' },
+    { value: 'cyber', label: 'Cyberpunk' }
+  ]},
+  { key: 'primaryColor', type: 'color', label: 'Primary Color', defaultValue: '#22c55e' },
+  { key: 'secondaryColor', type: 'color', label: 'Secondary Color', defaultValue: '#16a34a' },
+  { key: 'headStyle', type: 'select', label: 'Head Style', defaultValue: 'rounded', options: [
+    { value: 'rounded', label: 'Rounded' },
+    { value: 'square', label: 'Square' },
+    { value: 'diamond', label: 'Diamond' }
+  ]},
+  { key: 'eyeStyle', type: 'select', label: 'Eye Style', defaultValue: 'cute', options: [
+    { value: 'cute', label: 'Cute Anime' },
+    { value: 'classic', label: 'Classic Dots' },
+    { value: 'slits', label: 'Viper Slits' },
+    { value: 'glow', label: 'Glowing Eyes' }
+  ]},
+  { key: 'trail', type: 'select', label: 'Trail Effect', defaultValue: 'none', options: [
+    { value: 'none', label: 'None' },
+    { value: 'glow', label: 'Neon Glow' },
+    { value: 'rainbow', label: 'Rainbow Pulse' },
+    { value: 'particles', label: 'Sparkles' }
+  ]}
+];
+
+export const defaultSnakeCustomization = {
+  skin: 'classic',
+  primaryColor: '#22c55e',
+  secondaryColor: '#16a34a',
+  headStyle: 'rounded',
+  eyeStyle: 'cute',
+  trail: 'none'
+};
+
+export const twenty48CustomizationSchema: GameSettingDefinition[] = [
+  { key: 'theme', type: 'select', label: 'Tile Theme', defaultValue: 'classic', options: [
+    { value: 'classic', label: 'Classic Warm' },
+    { value: 'neon', label: 'Cyber Neon' },
+    { value: 'pastel', label: 'Pastel Dream' },
+    { value: 'synthwave', label: 'Synthwave 80s' },
+    { value: 'emerald', label: 'Emerald Mint' },
+    { value: 'dark', label: 'OLED Dark' }
+  ]},
+  { key: 'primaryColor', type: 'color', label: 'Accent Color', defaultValue: '#f59e0b' },
+  { key: 'tileShape', type: 'select', label: 'Tile Corners', defaultValue: 'rounded', options: [
+    { value: 'rounded', label: 'Smooth Rounded' },
+    { value: 'square', label: 'Crisp Square' },
+    { value: 'pill', label: 'Ultra Curved' }
+  ]},
+  { key: 'animations', type: 'toggle', label: 'Tile Merge Animations', defaultValue: true }
+];
+
+export const defaultTwenty48Customization = {
+  theme: 'classic',
+  primaryColor: '#f59e0b',
+  tileShape: 'rounded',
+  animations: true
+};
+
+export const reactionCustomizationSchema: GameSettingDefinition[] = [
+  { key: 'theme', type: 'select', label: 'Visual Style', defaultValue: 'classic', options: [
+    { value: 'classic', label: 'Signal Lights (Red/Green)' },
+    { value: 'cyber', label: 'Cyber Pulse (Cyan/Pink)' },
+    { value: 'minimal', label: 'Minimalist Monochrome' },
+    { value: 'sunset', label: 'Sunset Glow' }
+  ]},
+  { key: 'targetStyle', type: 'select', label: 'Target Graphic', defaultValue: 'fullscreen', options: [
+    { value: 'fullscreen', label: 'Full Screen Flash' },
+    { value: 'circle', label: 'Center Bullseye' },
+    { value: 'bolt', label: 'Lightning Strike ⚡' }
+  ]},
+  { key: 'primaryColor', type: 'color', label: 'Custom Accent', defaultValue: '#ef4444' }
+];
+
+export const defaultReactionCustomization = {
+  theme: 'classic',
+  targetStyle: 'fullscreen',
+  primaryColor: '#ef4444'
+};
+
+export const minesweeperCustomizationSchema: GameSettingDefinition[] = [
+  { key: 'theme', type: 'select', label: 'Board Palette', defaultValue: 'modern', options: [
+    { value: 'modern', label: 'Modern Sleek' },
+    { value: 'retro', label: 'Classic Windows 95' },
+    { value: 'matrix', label: 'Green Matrix' },
+    { value: 'dark', label: 'Deep Charcoal' }
+  ]},
+  { key: 'flagStyle', type: 'select', label: 'Flag Marker', defaultValue: 'flag', options: [
+    { value: 'flag', label: 'Standard Flag 🚩' },
+    { value: 'warning', label: 'Hazard Sign ⚠️' },
+    { value: 'pin', label: 'Red Pin 📍' },
+    { value: 'skull', label: 'Danger Skull 💀' }
+  ]},
+  { key: 'mineStyle', type: 'select', label: 'Mine Graphic', defaultValue: 'bomb', options: [
+    { value: 'bomb', label: 'Classic Bomb 💣' },
+    { value: 'spike', label: 'Spike Mine 💥' },
+    { value: 'hazard', label: 'Biohazard ☣️' }
+  ]},
+  { key: 'primaryColor', type: 'color', label: 'Board Accent', defaultValue: '#6366f1' }
+];
+
+export const defaultMinesweeperCustomization = {
+  theme: 'modern',
+  flagStyle: 'flag',
+  mineStyle: 'bomb',
+  primaryColor: '#6366f1'
+};
+
+export const sudokuCustomizationSchema: GameSettingDefinition[] = [
+  { key: 'theme', type: 'select', label: 'Board Theme', defaultValue: 'clean', options: [
+    { value: 'clean', label: 'Clean Paper' },
+    { value: 'midnight', label: 'Midnight Blue' },
+    { value: 'coffee', label: 'Warm Sepia' },
+    { value: 'blueprint', label: 'Architect Blueprint' }
+  ]},
+  { key: 'primaryColor', type: 'color', label: 'Selected Cell Highlight', defaultValue: '#0ea5e9' },
+  { key: 'matchingHighlight', type: 'toggle', label: 'Highlight Matching Numbers', defaultValue: true },
+  { key: 'errorHighlight', type: 'toggle', label: 'Highlight Conflicts Instantly', defaultValue: true }
+];
+
+export const defaultSudokuCustomization = {
+  theme: 'clean',
+  primaryColor: '#0ea5e9',
+  matchingHighlight: true,
+  errorHighlight: true
+};
+
+export const typingCustomizationSchema: GameSettingDefinition[] = [
+  { key: 'fontStyle', type: 'select', label: 'Typography', defaultValue: 'mono', options: [
+    { value: 'mono', label: 'JetBrains / Code Monospace' },
+    { value: 'sans', label: 'Modern Inter Sans' },
+    { value: 'terminal', label: 'Retro Terminal Pixel' },
+    { value: 'serif', label: 'Editorial Serif' }
+  ]},
+  { key: 'theme', type: 'select', label: 'Color Accent', defaultValue: 'neon', options: [
+    { value: 'neon', label: 'Cyber Purple' },
+    { value: 'matrix', label: 'Hacker Green' },
+    { value: 'slate', label: 'Slate Minimal' },
+    { value: 'amber', label: 'Vintage Amber' }
+  ]},
+  { key: 'caretStyle', type: 'select', label: 'Caret Indicator', defaultValue: 'line', options: [
+    { value: 'line', label: 'Smooth Vertical Line' },
+    { value: 'block', label: 'Terminal Solid Block' },
+    { value: 'underline', label: 'Subtle Underline' }
+  ]},
+  { key: 'primaryColor', type: 'color', label: 'Active Letter Glow', defaultValue: '#8b5cf6' }
+];
+
+export const defaultTypingCustomization = {
+  fontStyle: 'mono',
+  theme: 'neon',
+  caretStyle: 'line',
+  primaryColor: '#8b5cf6'
+};
+
+
 export const snakeSchema: GameSettingDefinition[] = [
   // Basic
   { key: 'speed', type: 'select', label: 'Speed', defaultValue: 'normal', options: [{label: 'Slow', value: 'slow'}, {label: 'Normal', value: 'normal'}, {label: 'Fast', value: 'fast'}, {label: 'Chaos', value: 'chaos'}] },
@@ -124,3 +289,28 @@ export const GAME_SCHEMAS: Record<string, GameSettingDefinition[]> = {
   '2048': twenty48Schema,
   'reaction-test': reactionSchema
 };
+
+export const GAME_CUSTOMIZATION_SCHEMAS: Record<string, GameSettingDefinition[]> = {
+  'snake': snakeCustomizationSchema,
+  'snake-arena': snakeCustomizationSchema,
+  '2048': twenty48CustomizationSchema,
+  'reaction': reactionCustomizationSchema,
+  'reaction-test': reactionCustomizationSchema,
+  'minesweeper': minesweeperCustomizationSchema,
+  'sudoku': sudokuCustomizationSchema,
+  'typing': typingCustomizationSchema,
+  'typing-test': typingCustomizationSchema,
+};
+
+export const DEFAULT_GAME_CUSTOMIZATIONS: Record<string, Record<string, any>> = {
+  'snake': defaultSnakeCustomization,
+  'snake-arena': defaultSnakeCustomization,
+  '2048': defaultTwenty48Customization,
+  'reaction': defaultReactionCustomization,
+  'reaction-test': defaultReactionCustomization,
+  'minesweeper': defaultMinesweeperCustomization,
+  'sudoku': defaultSudokuCustomization,
+  'typing': defaultTypingCustomization,
+  'typing-test': defaultTypingCustomization,
+};
+

@@ -31,7 +31,7 @@ export default function Profile() {
       AchievementEngine.getUnlockedAchievements(player.id).then(setUnlockedAchievements);
       XPEngine.getXPStats(player.id).then(setXpProgress);
     });
-  }, [player?.id]);
+  }, [player]);
 
   const handleSaveName = async () => {
     const trimmed = nameInput.trim();

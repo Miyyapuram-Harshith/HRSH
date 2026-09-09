@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { usePlayerStore } from '../../stores/playerStore';
 import type { GameComponentProps, GameResult } from '../../types/game';
 
 // ============================================================
@@ -75,6 +76,16 @@ function floodFill(board: Cell[][], r: number, c: number, rows: number, cols: nu
 }
 
 function MinesweeperGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameComponentProps) {
+  const { settings } = usePlayerStore();
+  const customization = (settings as any)?.customizations?.['minesweeper'] || {};
+  const flagStyle = customization.flagStyle || 'flag';
+  const mineStyle = customization.mineStyle || 'bomb';
+  const primaryColor = customization.primaryColor || '#6366f1';
+  const theme = customization.theme || 'modern';
+
+  const flagIcon = flagStyle === 'warning' ? '⚠️' : flagStyle === 'pin' ? '📍' : flagStyle === 'skull' ? '💀' : '🚩';
+  const mineIcon = mineStyle === 'spike' ? '💥' : mineStyle === 'hazard' ? '☣️' : '💣';
+
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [board, setBoard] = useState<Cell[][] | null>(null);
   const [gameOver, setGameOver] = useState(false);
@@ -189,16 +200,17 @@ function MinesweeperGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
   }, [board, gameOver, isPaused]);
 
   const getCellContent = (cell: Cell) => {
-    if (cell.flagged && !cell.revealed) return '🚩';
+    if (cell.flagged && !cell.revealed) return flagIcon;
     if (!cell.revealed) return '';
-    if (cell.mine) return '💣';
+    if (cell.mine) return mineIcon;
     if (cell.adjacent === 0) return '';
     return cell.adjacent;
   };
 
   const getCellColor = (cell: Cell) => {
     if (!cell.revealed) return '';
-    const colors = ['', '#3b82f6', '#22c55e', '#ef4444', '#7c3aed', '#dc2626', '#0891b2', '#000', '#71717a'];
+    if (theme === 'matrix') return '#22c55e';
+    const colors = ['', primaryColor, '#22c55e', '#ef4444', '#7c3aed', '#dc2626', '#0891b2', '#000', '#71717a'];
     return colors[cell.adjacent] || '';
   };
 

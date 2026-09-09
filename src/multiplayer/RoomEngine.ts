@@ -19,40 +19,55 @@ export class RoomEngine {
     : 'ws://localhost:8787';
 
   static async connect(roomId: string, requestedTeamCode?: string | null) {
-    const { player } = usePlayerStore.getState();
+    const { player, settings } = usePlayerStore.getState();
     if (!player) return;
 
-    this.currentRoomId = roomId;
-    this.disconnect(true); // silent disconnect (no state reset)
-    // Only reset state if we are joining a completely new room
-    if (useRoomStore.getState().roomId !== roomId) {
+    const normalizedRoomId = roomId.trim().toUpperCase();
+
+    // Prevent duplicate connections to the exact same room if socket is already open or connecting
+    if (this.currentRoomId === normalizedRoomId && this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    this.currentRoomId = normalizedRoomId;
+    this.disconnect(true); // silent disconnect from any prior room
+    
+    // Reset state if changing room
+    if (useRoomStore.getState().roomId !== normalizedRoomId) {
       useRoomStore.getState().reset();
     }
-    useRoomStore.getState().updateState({ roomId, connectionState: 'CONNECTING' });
+    
+    useRoomStore.getState().updateState({ roomId: normalizedRoomId, connectionState: 'CONNECTING', error: null });
 
-    const wsUrl = `${this.URL_BASE}/api/room/${roomId}?playerId=${player.id}&playerName=${encodeURIComponent(player.name || 'Anonymous')}`;
+    const wsUrl = `${this.URL_BASE}/api/room/${normalizedRoomId}?playerId=${encodeURIComponent(player.id)}&playerName=${encodeURIComponent(player.name || 'Anonymous')}`;
     
     // Check if we have initial settings from CreateRoom
     let initialSettings = null;
-    const settingsStr = sessionStorage.getItem(`hrsh_initial_settings_${roomId}`);
+    const settingsStr = sessionStorage.getItem(`hrsh_initial_settings_${normalizedRoomId}`);
     if (settingsStr) {
       try {
         initialSettings = JSON.parse(settingsStr);
-        sessionStorage.removeItem(`hrsh_initial_settings_${roomId}`);
-      } catch (e) {}
+        sessionStorage.removeItem(`hrsh_initial_settings_${normalizedRoomId}`);
+      } catch (e) {
+        // Ignore JSON parse error
+      }
     }
+
+    const savedCustomization = (settings as any)?.customizations || {};
 
     try {
       this.ws = new WebSocket(wsUrl);
-    } catch {
-      useRoomStore.getState().updateState({ connectionState: 'ERROR' });
+    } catch (err) {
+      console.error('[RoomEngine] Failed to instantiate WebSocket:', err);
+      useRoomStore.getState().updateState({ connectionState: 'ERROR', error: 'Could not connect to room server.' });
       return;
     }
 
     // Connection timeout
     if (this.connectionTimeoutTimer) clearTimeout(this.connectionTimeoutTimer);
     this.connectionTimeoutTimer = setTimeout(() => {
-      if (useRoomStore.getState().connectionState === 'CONNECTING' || useRoomStore.getState().connectionState === 'AUTHENTICATING') {
+      const currentState = useRoomStore.getState().connectionState;
+      if (currentState === 'CONNECTING' || currentState === 'AUTHENTICATING') {
         useRoomStore.getState().updateState({ connectionState: 'ERROR', error: 'Connection timed out. Please try again.' });
         if (this.ws) this.ws.close();
       }
@@ -64,13 +79,14 @@ export class RoomEngine {
       
       useRoomStore.getState().updateState({ connectionState: 'AUTHENTICATING', isConnected: true, error: null });
       
-      // Explicit JOIN handshake
+      // Explicit JOIN handshake with player info and customization
       this.ws?.send(JSON.stringify({
         type: 'ROOM_JOIN',
         playerId: player.id,
-        playerName: player.name,
+        playerName: player.name || 'Anonymous',
         initialSettings,
-        requestedTeamCode
+        requestedTeamCode,
+        customization: savedCustomization
       }));
 
       // Start heartbeat
@@ -82,7 +98,7 @@ export class RoomEngine {
         const msg = JSON.parse(event.data);
         
         if (msg.type === 'ROOM_JOINED') {
-          useRoomStore.getState().updateState({ connectionState: 'CONNECTED' });
+          useRoomStore.getState().updateState({ connectionState: 'CONNECTED', error: null });
           // Flush queued messages after successful join
           for (const queuedMsg of this.messageQueue) {
             this.send(queuedMsg);
@@ -90,23 +106,23 @@ export class RoomEngine {
           this.messageQueue = [];
         } else if (msg.type === 'ROOM_STATE') {
           const currentVersion = useRoomStore.getState().version;
-          if (msg.state.version && msg.state.version <= currentVersion) {
+          if (msg.state.version && msg.state.version < currentVersion) {
             return; // Ignore stale state
           }
-          useRoomStore.getState().updateState({ ...msg.state, connectionState: 'CONNECTED' });
+          useRoomStore.getState().updateState({ ...msg.state, connectionState: 'CONNECTED', error: null });
         } else if (msg.type === 'ERROR') {
-          useRoomStore.getState().updateState({ connectionState: 'ERROR', error: msg.message });
+          useRoomStore.getState().updateState({ connectionState: 'ERROR', error: msg.message || 'Room error' });
           if (msg.code === 'ROOM_NOT_FOUND' || msg.code === 'ROOM_FULL' || msg.code === 'ROOM_CLOSED') {
-             // Do not reconnect for these explicit rejections, preserve ERROR state
+             // Do not reconnect for explicit rejections
              this.disconnect(true);
           }
         } else if (msg.type === 'KICKED') {
-          useRoomStore.getState().setError('You have been kicked from the room.');
+          useRoomStore.getState().updateState({ connectionState: 'ERROR', error: 'You have been removed from the room by the host.' });
           this.disconnect();
         } else if (msg.type === 'MATCH_PROGRESS_UPDATE') {
           // Parse compact array: [id, progress, liveValue, rank, finished]
           const updatedPlayers = useRoomStore.getState().players.map(p => {
-            const update = msg.leaderboard.find((l: any[]) => l[0] === p.id);
+            const update = msg.leaderboard?.find((l: any[]) => l[0] === p.id);
             if (update) {
               return {
                 ...p,
@@ -123,7 +139,7 @@ export class RoomEngine {
           // Heartbeat response
         }
       } catch (e) {
-        console.error('WebSocket message parsing error', e);
+        console.error('[RoomEngine] WebSocket message parsing error:', e);
       }
     };
 
