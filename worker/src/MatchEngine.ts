@@ -107,6 +107,7 @@ export class MatchEngine {
         drawOffer: null,
         reason: null
       };
+
     } else if (gameId === 'word-guesser') {
       return {
         players: playerIds,
@@ -118,7 +119,7 @@ export class MatchEngine {
         timeRemaining: 60,
         winner: null
       };
-    } else if (gameId === 'typing-test') {
+    } else if (gameId === 'typing') {
       const difficulty = settings?.gameSettings?.difficulty || 'normal';
       const duration = settings?.gameSettings?.duration || 60;
       
@@ -198,7 +199,7 @@ export class MatchEngine {
     let matchEnded = false;
 
     // Turn check
-    if (gameId !== 'snake-arena' && gameId !== 'typing-test') {
+    if (gameId !== 'snake-arena' && gameId !== 'typing') {
        if (gameState.turn !== playerId) return { updated: false, matchEnded: false };
     }
 
@@ -635,7 +636,7 @@ export class MatchEngine {
         return { updated: true, matchEnded: true };
       }
       return { updated: false, matchEnded: false };
-    } else if (gameId === 'typing-test') {
+    } else if (gameId === 'typing') {
       return { updated: false, matchEnded: false };
     } else {
       if (gameState && gameState.players) {

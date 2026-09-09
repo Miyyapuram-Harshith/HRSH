@@ -288,7 +288,7 @@ export default function RoomLobby() {
               <span className="text-text-muted text-sm font-bold uppercase tracking-widest mb-1">Room Code</span>
               <div className="flex items-center gap-3">
                 <span className="text-4xl font-black text-hrsh-accent tracking-widest font-mono">
-                  {room.roomCode.match(/.{1,3}/g)?.join('-')}
+                  {room.roomCode}
                 </span>
                 <button 
                   onClick={() => {

@@ -136,10 +136,10 @@ const games: GameMetadata[] = [
     title: 'Typing Race',
     description: 'Type the displayed words as fast and accurately as you can. Track your words per minute (WPM) and accuracy across timed sessions.',
     shortDescription: 'Type fast. Be accurate.',
-    category: 'solo',
-    multiplayer: false,
+    category: 'party',
+    multiplayer: true,
     minPlayers: 1,
-    maxPlayers: 1,
+    maxPlayers: 15,
     modes: [
       { id: '30s', label: '30 seconds' },
       { id: '60s', label: '60 seconds' },
@@ -158,6 +158,7 @@ const games: GameMetadata[] = [
       finishCondition: 'completion',
       resultShape: 'ranked'
     },
+    room: { visibility: ['private', 'public'], spectators: true, autoStart: true, countdown: [3, 5], rematch: true },
     component: () => import('../games/typing/TypingGame'),
   },
 

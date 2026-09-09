@@ -146,7 +146,7 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
       onMatchFinished(localStats.progress, localStats.wpm);
     } else if (!isMultiplayer) {
       const result: GameResult = {
-        gameId: 'typing-test',
+        gameId: 'typing',
         mode: `${duration}s`,
         score: localStats.wpm,
         won: localStats.wpm >= 30,
