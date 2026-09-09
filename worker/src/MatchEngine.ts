@@ -152,7 +152,7 @@ export class MatchEngine {
       return {
         challenge: selected.join(' '),
         duration: duration,
-        startTime: Date.now() + 3000 // 3 seconds buffer to allow countdowns to sync
+        startTime: Date.now() + 5000 // 5 seconds buffer to allow countdowns to sync
       };
     } else if (gameId === 'imposter') {
         const words = ['APPLE', 'BANANA', 'ELEPHANT', 'GUITAR', 'PIRATE', 'GALAXY', 'OCEAN', 'MOUNTAIN', 'ROBOT', 'VAMPIRE'];

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import { usePlayerStore } from '../../stores/playerStore';
+import type { PlayerInfo } from '../../stores/roomStore';
 
 interface TypingAreaProps {
   challengeText: string;
@@ -9,6 +10,8 @@ interface TypingAreaProps {
   onLocalStatsUpdate?: (wpm: number, accuracy: number, progress: number) => void;
   started: boolean;
   onFirstKeydown: () => void;
+  roomPlayers?: PlayerInfo[];
+  myPlayerId?: string;
 }
 
 export const TypingArea = memo(function TypingArea({ 
@@ -18,7 +21,9 @@ export const TypingArea = memo(function TypingArea({
   onFinish,
   onLocalStatsUpdate,
   started,
-  onFirstKeydown
+  onFirstKeydown,
+  roomPlayers,
+  myPlayerId
 }: TypingAreaProps) {
   const { settings } = usePlayerStore();
   const customization = (settings as any)?.customizations?.['typing'] || {};
@@ -34,6 +39,9 @@ export const TypingArea = memo(function TypingArea({
   const totalChars = useRef(0);
   const correctChars = useRef(0);
   const lastProgressSentTime = useRef(0);
+  
+  const activeCharRef = useRef<HTMLSpanElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Focus management
   useEffect(() => {
@@ -41,6 +49,22 @@ export const TypingArea = memo(function TypingArea({
       inputRef.current?.focus();
     }
   }, [started, finished, isPaused]);
+  
+  // Auto-scroll to active character
+  useEffect(() => {
+      if (activeCharRef.current && scrollContainerRef.current) {
+          const container = scrollContainerRef.current;
+          const charElement = activeCharRef.current;
+          
+          const containerRect = container.getBoundingClientRect();
+          const charRect = charElement.getBoundingClientRect();
+          
+          // If character is below the middle of the container, or above it
+          if (charRect.bottom > containerRect.bottom - 40 || charRect.top < containerRect.top + 40) {
+              charElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+      }
+  }, [typed.length]);
 
   // Click to focus
   const handleAreaClick = () => {
@@ -108,13 +132,26 @@ export const TypingArea = memo(function TypingArea({
   const renderText = () => {
     if (!challengeText) return null;
     
+    // Precompute remote player positions to avoid doing it per character
+    const remoteCursors: Record<number, PlayerInfo[]> = {};
+    if (roomPlayers) {
+        roomPlayers.forEach(p => {
+            if (p.id === myPlayerId || p.isSpectator || p.finished) return;
+            const index = Math.min(challengeText.length - 1, Math.floor((p.progress || 0) * challengeText.length));
+            if (!remoteCursors[index]) remoteCursors[index] = [];
+            remoteCursors[index].push(p);
+        });
+    }
+    
     return challengeText.split('').map((char, i) => {
       let className = 'text-text-muted';
       let customStyle: React.CSSProperties = {};
+      let isCurrentChar = false;
 
       if (i < typed.length) {
         className = typed[i] === char ? 'text-text-primary font-medium' : 'text-red-400 bg-red-400/20 rounded-xs';
       } else if (i === typed.length && started && !isPaused && !finished) {
+        isCurrentChar = true;
         className = `text-white font-bold rounded-xs relative ${
           caretStyle === 'block' ? 'bg-text-primary text-black' : caretStyle === 'underline' ? 'border-b-2' : 'border-l-2 animate-pulse'
         }`;
@@ -124,9 +161,32 @@ export const TypingArea = memo(function TypingArea({
           boxShadow: `0 0 10px ${primaryColor}`
         };
       }
+      
+      const remotePlayersOnChar = remoteCursors[i];
+      
       return (
-        <span key={i} className={className} style={customStyle}>
+        <span 
+            key={i} 
+            className={`${className} relative inline-block`} 
+            style={customStyle}
+            ref={isCurrentChar ? activeCharRef : null}
+        >
           {char}
+          
+          {/* Render Remote Cursors */}
+          {remotePlayersOnChar && remotePlayersOnChar.map((p, idx) => (
+             <div 
+                 key={p.id}
+                 className="absolute -top-6 left-0 flex flex-col items-center pointer-events-none z-10 transition-all duration-200 ease-linear"
+                 style={{ transform: `translateY(-${idx * 14}px)` }}
+             >
+                 <div className="bg-surface-overlay border text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap opacity-80"
+                      style={{ borderColor: p.teamId ? 'var(--color-hrsh-accent)' : '#fff', color: p.teamId ? 'var(--color-hrsh-accent)' : '#fff' }}>
+                     {p.name.substring(0, 6)}
+                 </div>
+                 <div className="w-0.5 h-6 bg-hrsh-accent/50 -mt-1"></div>
+             </div>
+          ))}
         </span>
       );
     });
@@ -139,7 +199,10 @@ export const TypingArea = memo(function TypingArea({
       }`}
       onClick={handleAreaClick}
     >
-      <div className={`${fontClass} text-sm sm:text-lg leading-relaxed h-32 overflow-hidden select-none whitespace-pre-wrap break-words`}>
+      <div 
+        ref={scrollContainerRef}
+        className={`${fontClass} text-sm sm:text-lg leading-relaxed h-32 sm:h-48 overflow-y-auto overflow-x-hidden select-none whitespace-pre-wrap break-words scrollbar-hide scroll-smooth relative pt-8 pb-16`}
+      >
         {renderText()}
       </div>
 
@@ -165,13 +228,9 @@ export const TypingArea = memo(function TypingArea({
         </div>
       )}
       
-      {finished && (
-        <div className="absolute inset-0 flex items-center justify-center bg-surface-base/80 backdrop-blur-sm rounded-xl pointer-events-none animate-[fade-in_0.3s_ease-out]">
-          <div className="flex flex-col items-center">
-            <span className="text-4xl mb-2">🏁</span>
-            <div className="text-xl font-bold text-text-primary">Finished!</div>
-            <div className="text-sm font-medium text-text-muted mt-1">Waiting for others...</div>
-          </div>
+      {finished && !isPaused && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-[fade-in_0.3s_ease-out] z-10 opacity-0">
+          {/* Banner moved to TypingGame.tsx so text stays visible */}
         </div>
       )}
     </div>

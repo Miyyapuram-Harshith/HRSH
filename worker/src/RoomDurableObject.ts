@@ -691,6 +691,39 @@ export class RoomDurableObject {
       this.progressTickTimer = null;
     }
     this.tickProgressBroadcast(); // Final flush
+    
+    // Save match to D1 Database
+    if (this.env.DB && this.settings?.gameId) {
+        const db = new Database(this.env.DB);
+        const playersData = Array.from(this.players.values()).filter(p => !p.isSpectator).map(p => ({
+          id: p.id,
+          score: p.progress,
+          rank: p.rank || 0,
+          metrics: { liveValue: p.liveMetricValue }
+        }));
+        
+        // Find winner (player with highest progress, or lowest time, etc)
+        // For generic progress-based games:
+        const sorted = [...playersData].sort((a, b) => {
+            if (a.rank && b.rank) return a.rank - b.rank;
+            return b.score - a.score;
+        });
+        const winnerId = sorted.length > 0 ? sorted[0].id : null;
+        
+        db.recordMatch(
+          this.settings.gameId,
+          this.settings.mode || 'classic',
+          this.settings || {},
+          winnerId,
+          playersData
+        ).catch(err => console.error("Failed to save match to DB in endMatch:", err));
+        
+        playersData.forEach(p => {
+          const xp = p.id === winnerId ? 50 : 10;
+          db.addXP(p.id, xp).catch(err => console.error("Failed to add XP:", err));
+        });
+    }
+
     this.broadcastState();
   }
 

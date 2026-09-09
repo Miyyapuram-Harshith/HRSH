@@ -51,6 +51,9 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
   const [localStats, setLocalStats] = useState({ wpm: 0, accuracy: 100, progress: 0 });
   const [liveEvent, setLiveEvent] = useState<string | null>(null);
   
+  // Countdown logic
+  const [countdown, setCountdown] = useState<number | null>(null);
+  
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Initialization
@@ -61,14 +64,28 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
       setDuration(targetDuration);
       setText(multiplayerState.challenge || 'Waiting for text...');
       
-      // If multiplayer, start automatically when server says it's time
-      if (!hasStarted) {
-        onGameStart();
-        setHasStarted(true);
+      if (multiplayerState.startTime) {
+        const timeUntilStart = multiplayerState.startTime - Date.now();
+        if (timeUntilStart > 0) {
+            setCountdown(Math.ceil(timeUntilStart / 1000));
+            setHasStarted(false);
+        } else {
+            setCountdown(null);
+            if (!hasStarted) {
+                onGameStart();
+                setHasStarted(true);
+            }
+        }
+      } else {
+        if (!hasStarted) {
+          onGameStart();
+          setHasStarted(true);
+        }
       }
     } else {
       setDuration(60);
       setText(generateText(200));
+      setCountdown(null);
     }
   }, [isMultiplayer, multiplayerState, onGameStart, hasStarted]);
 
@@ -76,27 +93,43 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
 
-    if (hasStarted && !hasFinished && !isPaused) {
+    if (!isPaused) {
       timerRef.current = setInterval(() => {
-        let remaining = duration;
-        
         if (isMultiplayer && multiplayerState?.startTime) {
-          // Authoritative sync with server time
-          const elapsed = Math.floor((Date.now() - multiplayerState.startTime) / 1000);
-          remaining = Math.max(0, duration - elapsed);
-        } else {
-          // Solo mode decrement
-          setTimeLeft(prev => {
-            const next = prev - 1;
-            if (next <= 0) handleAutoFinish();
-            return Math.max(0, next);
-          });
-          return;
+            const timeUntilStart = multiplayerState.startTime - Date.now();
+            if (timeUntilStart > 0) {
+                setCountdown(Math.ceil(timeUntilStart / 1000));
+                return; // Don't start game timer yet
+            } else if (countdown !== null) {
+                setCountdown(null);
+                if (!hasStarted) {
+                    setHasStarted(true);
+                    onGameStart();
+                }
+            }
         }
 
-        setTimeLeft(remaining);
-        if (remaining <= 0) {
-          handleAutoFinish();
+        if (hasStarted && !hasFinished) {
+            let remaining = duration;
+            
+            if (isMultiplayer && multiplayerState?.startTime) {
+              // Authoritative sync with server time
+              const elapsed = Math.floor((Date.now() - multiplayerState.startTime) / 1000);
+              remaining = Math.max(0, duration - elapsed);
+            } else {
+              // Solo mode decrement
+              setTimeLeft(prev => {
+                const next = prev - 1;
+                if (next <= 0) handleAutoFinish();
+                return Math.max(0, next);
+              });
+              return;
+            }
+
+            setTimeLeft(remaining);
+            if (remaining <= 0) {
+              handleAutoFinish();
+            }
         }
       }, 1000);
     }
@@ -137,16 +170,29 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
     if (isMultiplayer && onMatchProgress) {
       onMatchProgress(progress, wpm);
       
-      // Live event detection (very basic for UI flair)
-      if (progress > 0.9 && roomPlayers) {
-          const topPlayers = [...roomPlayers].sort((a, b) => {
+      // Live event detection
+      if (roomPlayers) {
+          const activePlayers = [...roomPlayers].filter(p => !p.isSpectator);
+          
+          const sorted = [...activePlayers].sort((a, b) => {
             const progB = b.progress || 0;
             const progA = a.progress || 0;
             return progB - progA;
           });
-          if (topPlayers.length > 1) {
-              const diff = (topPlayers[0].progress || 0) - (topPlayers[1].progress || 0);
-              if (diff > 0 && diff < 0.02) {
+          
+          if (sorted.length > 1) {
+              const myRank = sorted.findIndex(p => p.id === myPlayerId);
+              if (myRank > 0) {
+                  const playerAhead = sorted[myRank - 1];
+                  const diff = (playerAhead.progress || 0) - progress;
+                  
+                  if (diff > 0 && diff < 0.05 && progress > 0.5) {
+                      setLiveEvent('FINAL SPRINT!');
+                      setTimeout(() => setLiveEvent(null), 2000);
+                  }
+              }
+              
+              if (progress > 0.95 && sorted[0].id !== myPlayerId && (sorted[0].progress || 0) - progress < 0.02) {
                   setLiveEvent('PHOTO FINISH!');
                   setTimeout(() => setLiveEvent(null), 3000);
               }
@@ -252,13 +298,48 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
           )}
           <TypingArea 
             challengeText={text}
-            isPaused={isPaused || hasFinished}
+            isPaused={isPaused || hasFinished || (countdown !== null && countdown > 0)}
             started={hasStarted}
             onFirstKeydown={handleFirstKeydownSolo}
             onProgressThrottled={handleProgressThrottled}
             onLocalStatsUpdate={handleLocalStatsUpdate}
             onFinish={handleTypingFinish}
+            roomPlayers={isMultiplayer ? roomPlayers : undefined}
+            myPlayerId={myPlayerId}
           />
+          
+          {/* Countdown Overlay */}
+          {countdown !== null && countdown > 0 && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface-base/80 backdrop-blur-sm rounded-xl">
+                <div className="flex flex-col items-center animate-[pop-in_0.3s_ease-out]">
+                    <div className="text-6xl sm:text-8xl font-black text-hrsh-accent animate-pulse drop-shadow-lg">
+                        {countdown}
+                    </div>
+                    <div className="mt-4 text-xl sm:text-2xl font-bold uppercase tracking-[0.3em] text-text-primary">
+                        Get Ready
+                    </div>
+                </div>
+            </div>
+          )}
+          
+          {/* Finish Banner Overlay */}
+          {hasFinished && isMultiplayer && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-11/12 max-w-sm bg-surface-raised border-2 border-hrsh-accent/50 shadow-2xl rounded-2xl p-4 flex flex-col items-center animate-[slide-up_0.3s_ease-out]">
+                <div className="text-3xl mb-1">🏁</div>
+                <div className="text-xl font-black text-text-primary uppercase tracking-wider">Race Finished</div>
+                <div className="flex gap-4 mt-2 mb-1 w-full justify-center">
+                    <div className="text-center">
+                        <div className="text-2xl font-mono font-bold text-hrsh-accent">{localStats.wpm}</div>
+                        <div className="text-[10px] text-text-muted font-bold uppercase">WPM</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-2xl font-mono font-bold text-status-success">{localStats.accuracy}%</div>
+                        <div className="text-[10px] text-text-muted font-bold uppercase">ACC</div>
+                    </div>
+                </div>
+                <div className="text-xs text-text-muted font-medium mt-2 animate-pulse">Waiting for others to finish...</div>
+            </div>
+          )}
       </div>
 
       {/* Multiplayer Leaderboard */}
