@@ -54,6 +54,50 @@ export default function Profile() {
   const levelColor = xpProgress ? XPEngine.getLevelColor(xpProgress.level) : '#a1a1aa';
   const levelTitle = xpProgress ? XPEngine.getLevelTitle(xpProgress.level) : 'Newcomer';
 
+  const getProfilePersonality = () => {
+    if (!stats) return { title: 'The Unknown', quote: 'Play some games to establish a personality.' };
+    
+    if (streak && streak.currentStreak >= 7) {
+      return { title: 'The Dedicated', quote: 'You log in more than our developers.' };
+    }
+    
+    if (stats.winRate >= 80 && stats.gamesPlayed >= 10) {
+      return { title: 'The Tryhard', quote: 'Take a break. Let someone else win for once.' };
+    }
+
+    if (stats.winRate <= 20 && stats.gamesPlayed >= 10) {
+      return { title: 'The Participant', quote: 'Winning isn\'t everything. Which is good news for you.' };
+    }
+    
+    if (stats.favoriteGameId === 'snake' || stats.favoriteGameId === 'snake-arena') {
+      return { title: 'The Reptile', quote: 'We get it, you like Snake.' };
+    }
+
+    if (stats.favoriteGameId === 'typing' || stats.favoriteGameId === 'typing-test') {
+      return { title: 'The Keyboard Warrior', quote: 'Your WPM is high, but your grass-touching metrics are low.' };
+    }
+    
+    if (stats.favoriteGameId === 'reaction' || stats.favoriteGameId === 'reaction-test') {
+      return { title: 'The Caffeine Addict', quote: 'Calm down.' };
+    }
+    
+    if (stats.favoriteGameId === 'minesweeper') {
+      return { title: 'The Risk Taker', quote: 'You enjoy clicking blindly and hoping for the best.' };
+    }
+
+    if (stats.favoriteGameId === 'imposter') {
+      return { title: 'The Suspect', quote: 'You are naturally untrustworthy.' };
+    }
+
+    if (xpProgress && xpProgress.level >= 10) {
+       return { title: 'The Veteran', quote: 'You have seen things. Mostly game over screens.' };
+    }
+
+    return { title: 'The Casual', quote: 'Statistically average. Respectably average.' };
+  };
+
+  const personality = getProfilePersonality();
+
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-[fade-in_0.2s_ease-out]">
       {/* Player card */}
@@ -124,6 +168,18 @@ export default function Profile() {
           </div>
         )}
       </div>
+
+      {/* Personality */}
+      {stats && (
+        <div className="bg-surface-raised border border-border-default rounded-xl p-4 flex items-center justify-between">
+          <div>
+            <div className="text-xs text-text-muted uppercase tracking-wider font-bold mb-1">HRSH Personality Analysis</div>
+            <div className="text-lg font-bold text-hrsh-accent">{personality.title}</div>
+            <div className="text-sm text-text-secondary italic">"{personality.quote}"</div>
+          </div>
+          <div className="text-4xl opacity-50">🤖</div>
+        </div>
+      )}
 
       {/* Stats */}
       {stats && (

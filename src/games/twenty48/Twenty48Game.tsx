@@ -128,9 +128,10 @@ function addRandomTile(board: Board): Board {
   return newBoard;
 }
 
-function slideRow(row: number[]): { row: number[]; score: number } {
+function slideRow(row: number[]): { row: number[]; score: number; maxMerged: number } {
   const filtered = row.filter((v) => v !== 0);
   let score = 0;
+  let maxMerged = 0;
   const merged: number[] = [];
   let i = 0;
   while (i < filtered.length) {
@@ -138,6 +139,7 @@ function slideRow(row: number[]): { row: number[]; score: number } {
       const val = filtered[i] * 2;
       merged.push(val);
       score += val;
+      if (val > maxMerged) maxMerged = val;
       i += 2;
     } else {
       merged.push(filtered[i]);
@@ -145,12 +147,13 @@ function slideRow(row: number[]): { row: number[]; score: number } {
     }
   }
   while (merged.length < SIZE) merged.push(0);
-  return { row: merged, score };
+  return { row: merged, score, maxMerged };
 }
 
-function moveBoard(board: Board, direction: string): { board: Board; score: number; moved: boolean } {
+function moveBoard(board: Board, direction: string): { board: Board; score: number; moved: boolean; maxMerged: number } {
   let totalScore = 0;
   let moved = false;
+  let highestMerge = 0;
   const newBoard = createEmptyBoard();
 
   const getLine = (i: number): number[] => {
@@ -174,13 +177,14 @@ function moveBoard(board: Board, direction: string): { board: Board; score: numb
 
   for (let i = 0; i < SIZE; i++) {
     const line = getLine(i);
-    const { row, score } = slideRow(line);
+    const { row, score, maxMerged } = slideRow(line);
     setLine(i, row);
     totalScore += score;
+    if (maxMerged > highestMerge) highestMerge = maxMerged;
     if (!moved && line.some((v, idx) => v !== row[idx])) moved = true;
   }
 
-  return { board: newBoard, score: totalScore, moved };
+  return { board: newBoard, score: totalScore, moved, maxMerged: highestMerge };
 }
 
 function canMove(board: Board): boolean {
@@ -215,8 +219,10 @@ function Twenty48Game({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameC
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
   const [started, setStarted] = useState(false);
+  const [liveEvent, setLiveEvent] = useState<string | null>(null);
   const moves = useRef(0);
   const startTime = useRef(0);
+  const sessionHighestMerge = useRef(0);
 
   const handleMove = useCallback((direction: string) => {
     if (gameOver || isPaused) return;
@@ -230,6 +236,15 @@ function Twenty48Game({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameC
     const result = moveBoard(board, direction);
     if (!result.moved) return;
 
+    if (result.maxMerged > sessionHighestMerge.current) {
+        sessionHighestMerge.current = result.maxMerged;
+    }
+
+    if (result.maxMerged >= 1024) {
+        setLiveEvent(`GIANT MERGE: ${result.maxMerged}!`);
+        setTimeout(() => setLiveEvent(null), 3000);
+    }
+
     moves.current++;
     const newScore = score + result.score;
     let newBoard = addRandomTile(result.board);
@@ -241,6 +256,8 @@ function Twenty48Game({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameC
     // Check win
     if (!won && getBestTile(newBoard) >= 2048) {
       setWon(true);
+      setLiveEvent("2048 HAS BEEN SUMMONED");
+      setTimeout(() => setLiveEvent(null), 4000);
     }
 
     // Check game over
@@ -254,7 +271,7 @@ function Twenty48Game({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameC
         duration: Date.now() - startTime.current,
         moves: moves.current,
         personalBest: false,
-        data: { bestTile: getBestTile(newBoard) },
+        data: { bestTile: getBestTile(newBoard), highestMerge: sessionHighestMerge.current },
         timestamp: Date.now(),
       };
       onGameEnd(gameResult);
@@ -320,11 +337,17 @@ function Twenty48Game({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameC
       </div>
 
       {/* Board */}
-      <div
-        className="w-full max-w-[360px] mx-auto select-none touch-none"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
+      <div className="relative">
+          {liveEvent && (
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-hrsh-accent text-white px-4 py-1 rounded-full font-black text-xl animate-bounce shadow-xl z-10 whitespace-nowrap">
+                  {liveEvent}
+              </div>
+          )}
+          <div
+            className="w-full max-w-[360px] mx-auto select-none touch-none"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
         <div className="bg-surface-raised border border-border-default rounded-xl p-2.5">
           <div className="grid grid-cols-4 gap-2">
             {board.flat().map((value, i) => {
@@ -346,6 +369,7 @@ function Twenty48Game({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameC
               );
             })}
           </div>
+        </div>
         </div>
       </div>
 

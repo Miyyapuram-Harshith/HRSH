@@ -276,6 +276,10 @@ export const reactionSchema: GameSettingDefinition[] = [
   { key: 'teamMode', type: 'toggle', label: 'Team Mode', defaultValue: false },
 ];
 
+export const imposterSchema: GameSettingDefinition[] = [
+  { key: 'wordCategory', type: 'select', label: 'Word Category', defaultValue: 'general', options: [{label: 'General', value: 'general'}] }
+];
+
 export const GAME_SCHEMAS: Record<string, GameSettingDefinition[]> = {
   'snake': snakeSchema,
   'snake-arena': snakeArenaSchema,
@@ -287,7 +291,8 @@ export const GAME_SCHEMAS: Record<string, GameSettingDefinition[]> = {
   'minesweeper': minesweeperSchema,
   'sudoku': sudokuSchema,
   '2048': twenty48Schema,
-  'reaction-test': reactionSchema
+  'reaction-test': reactionSchema,
+  'imposter': imposterSchema
 };
 
 export const GAME_CUSTOMIZATION_SCHEMAS: Record<string, GameSettingDefinition[]> = {

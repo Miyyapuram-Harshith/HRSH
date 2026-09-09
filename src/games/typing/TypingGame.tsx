@@ -49,6 +49,7 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
   
   // Local fast UI updates (WPM, Accuracy, Progress)
   const [localStats, setLocalStats] = useState({ wpm: 0, accuracy: 100, progress: 0 });
+  const [liveEvent, setLiveEvent] = useState<string | null>(null);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -135,8 +136,24 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
   const handleProgressThrottled = useCallback((progress: number, wpm: number) => {
     if (isMultiplayer && onMatchProgress) {
       onMatchProgress(progress, wpm);
+      
+      // Live event detection (very basic for UI flair)
+      if (progress > 0.9 && roomPlayers) {
+          const topPlayers = [...roomPlayers].sort((a, b) => {
+            const progB = b.progress || 0;
+            const progA = a.progress || 0;
+            return progB - progA;
+          });
+          if (topPlayers.length > 1) {
+              const diff = (topPlayers[0].progress || 0) - (topPlayers[1].progress || 0);
+              if (diff > 0 && diff < 0.02) {
+                  setLiveEvent('PHOTO FINISH!');
+                  setTimeout(() => setLiveEvent(null), 3000);
+              }
+          }
+      }
     }
-  }, [isMultiplayer, onMatchProgress]);
+  }, [isMultiplayer, onMatchProgress, roomPlayers]);
 
   const handleTypingFinish = useCallback((wpm: number, accuracy: number, elapsedMs: number) => {
     if (hasFinished) return;
@@ -227,15 +244,22 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
       </div>
 
       {/* Main Typing Area */}
-      <TypingArea 
-        challengeText={text}
-        isPaused={isPaused || hasFinished}
-        started={hasStarted}
-        onFirstKeydown={handleFirstKeydownSolo}
-        onProgressThrottled={handleProgressThrottled}
-        onLocalStatsUpdate={handleLocalStatsUpdate}
-        onFinish={handleTypingFinish}
-      />
+      <div className="relative">
+          {liveEvent && (
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-hrsh-accent text-white px-4 py-1 rounded-full font-black text-xl animate-bounce shadow-xl z-10 whitespace-nowrap">
+                  {liveEvent}
+              </div>
+          )}
+          <TypingArea 
+            challengeText={text}
+            isPaused={isPaused || hasFinished}
+            started={hasStarted}
+            onFirstKeydown={handleFirstKeydownSolo}
+            onProgressThrottled={handleProgressThrottled}
+            onLocalStatsUpdate={handleLocalStatsUpdate}
+            onFinish={handleTypingFinish}
+          />
+      </div>
 
       {/* Multiplayer Leaderboard */}
       {isMultiplayer && (
@@ -243,7 +267,7 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
           <TypingLeaderboard 
             players={roomPlayers} 
             myPlayerId={myPlayerId} 
-            maxDisplay={10} 
+            maxDisplay={15} 
           />
         </div>
       )}

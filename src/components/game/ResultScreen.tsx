@@ -31,6 +31,9 @@ export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPla
     return m > 0 ? `${m}m ${remainder}s` : `${s}s`;
   };
 
+  const moments = result.data?.moments as any[] | undefined;
+  const commentary = result.data?.commentary as string[] | undefined;
+
   return (
     <>
       <Confetti active={showConfetti} />
@@ -116,6 +119,25 @@ export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPla
                     Best tile: <span className="font-mono font-bold" style={{ color: game.color }}>{String(result.data.bestTile)}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Moments & Commentary */}
+            {moments && moments.length > 0 && (
+              <div className="mb-4 flex flex-wrap justify-center gap-2">
+                {moments.map((m: any) => (
+                  <span key={m.id} className="px-2 py-1 bg-surface-base border border-border-default rounded-full text-xs font-bold text-hrsh-accent animate-[scale-in_0.3s_ease-out]">
+                    ✨ {m.type.replace('_', ' ')}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {commentary && commentary.length > 0 && (
+              <div className="mb-6 p-4 bg-surface-base rounded-xl border border-border-default italic text-sm text-text-secondary">
+                {commentary.map((line: string, i: number) => (
+                  <p key={i} className={i > 0 ? "mt-2" : ""}>"{line}"</p>
+                ))}
               </div>
             )}
 

@@ -754,25 +754,31 @@ export class RoomDurableObject {
       finished: p.finished
     }));
 
-    const statePayload = {
-      type: 'ROOM_STATE',
-      state: {
-        roomId: this.roomId,
-        version: this.version,
-        status: this.status,
-        settings: this.settings,
-        teamsEnabled: this.teamsEnabled,
-        teams: this.teams,
-        players: clientPlayers,
-        gameState: this.gameState,
-        countdown: this.countdownValue
-      }
-    };
-
-    const msg = JSON.stringify(statePayload);
     for (const p of this.players.values()) {
       if (p.ws && p.ws.readyState === WebSocket.READY_STATE_OPEN) {
-        try { p.ws.send(msg); } catch (e) {}
+        
+        // Mask state per player if needed
+        let playerGameState = this.gameState;
+        if (this.gameState && this.settings?.gameId) {
+            playerGameState = MatchEngine.getMaskedState(this.settings.gameId, this.gameState, p.id);
+        }
+
+        const statePayload = {
+          type: 'ROOM_STATE',
+          state: {
+            roomId: this.roomId,
+            version: this.version,
+            status: this.status,
+            settings: this.settings,
+            teamsEnabled: this.teamsEnabled,
+            teams: this.teams,
+            players: clientPlayers,
+            gameState: playerGameState,
+            countdown: this.countdownValue
+          }
+        };
+
+        try { p.ws.send(JSON.stringify(statePayload)); } catch (e) {}
       }
     }
   }

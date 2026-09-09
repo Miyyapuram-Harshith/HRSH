@@ -5,7 +5,7 @@ import { usePlayerStore } from '../../stores/playerStore';
 import type { GameComponentProps, GameResult } from '../../types/game';
 
 // ============================================================
-// Snake Game — Canvas-based, 60fps, responsive with customization
+// Snake Game 2.0 — Input buffering, modifiers, curves
 // ============================================================
 
 const GRID_SIZE = 20;
@@ -20,6 +20,19 @@ interface Point {
 
 type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 
+type Modifier = 'WRAP' | 'NO_WALLS' | 'DOUBLE_FOOD';
+type SpeedSetting = 'SLOW' | 'NORMAL' | 'FAST' | 'INSANE' | 'PROGRESSIVE';
+
+function getSpeedMs(speed: SpeedSetting, moves: number): number {
+    switch (speed) {
+        case 'SLOW': return 200;
+        case 'NORMAL': return 150;
+        case 'FAST': return 100;
+        case 'INSANE': return 60;
+        case 'PROGRESSIVE': return Math.max(50, 180 - (moves * 0.5));
+    }
+}
+
 function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { settings } = usePlayerStore();
@@ -32,27 +45,28 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
   const headStyle = savedCustomization.headStyle || 'rounded';
   const trail = savedCustomization.trail || 'none';
 
-  const baseSpeed = mode === 'speed' ? 95 : 150;
-  const speedIncrease = mode === 'speed' ? 3 : 2;
+  const [activeModifiers, setActiveModifiers] = useState<Modifier[]>([]);
+  const [speedSetting, setSpeedSetting] = useState<SpeedSetting>('NORMAL');
 
   const gameState = useRef({
     snake: [{ x: 10, y: 10 }] as Point[],
     food: { x: 15, y: 10 } as Point,
+    food2: null as Point | null,
     direction: 'RIGHT' as Direction,
-    nextDirection: 'RIGHT' as Direction,
+    inputBuffer: [] as Direction[],
     score: 0,
-    speed: baseSpeed,
     gameStarted: false,
     gameOver: false,
     startTime: 0,
     moves: 0,
+    wrapped: false,
   });
 
   const tickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animFrame = useRef<number>(0);
   const [started, setStarted] = useState(false);
 
-  const spawnFood = useCallback(() => {
+  const spawnFood = useCallback((isSecond = false) => {
     const state = gameState.current;
     let food: Point;
     do {
@@ -60,8 +74,13 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
         x: Math.floor(Math.random() * GRID_SIZE),
         y: Math.floor(Math.random() * GRID_SIZE),
       };
-    } while (state.snake.some((s) => s.x === food.x && s.y === food.y));
-    state.food = food;
+    } while (
+        state.snake.some((s) => s.x === food.x && s.y === food.y) || 
+        (state.food && state.food.x === food.x && state.food.y === food.y) ||
+        (state.food2 && state.food2.x === food.x && state.food2.y === food.y)
+    );
+    if (isSecond) state.food2 = food;
+    else state.food = food;
   }, []);
 
   const endGame = useCallback(() => {
@@ -76,17 +95,21 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
       duration: Date.now() - state.startTime,
       moves: state.moves,
       personalBest: false,
-      data: { length: state.snake.length },
+      data: { length: state.snake.length, wrapped: state.wrapped, modifiers: activeModifiers, speed: speedSetting },
       timestamp: Date.now(),
     };
     onGameEnd(result);
-  }, [mode, onGameEnd]);
+  }, [mode, onGameEnd, activeModifiers, speedSetting]);
 
   const tick = useCallback(() => {
     const state = gameState.current;
     if (state.gameOver || isPaused) return;
 
-    state.direction = state.nextDirection;
+    // Input buffer logic
+    if (state.inputBuffer.length > 0) {
+        state.direction = state.inputBuffer.shift()!;
+    }
+
     const head = { ...state.snake[0] };
 
     switch (state.direction) {
@@ -96,10 +119,18 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
       case 'RIGHT': head.x += 1; break;
     }
 
-    // Wall collision
+    // Wrap / Wall collision
     if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
-      endGame();
-      return;
+        if (activeModifiers.includes('WRAP') || activeModifiers.includes('NO_WALLS')) {
+            if (head.x < 0) head.x = GRID_SIZE - 1;
+            if (head.x >= GRID_SIZE) head.x = 0;
+            if (head.y < 0) head.y = GRID_SIZE - 1;
+            if (head.y >= GRID_SIZE) head.y = 0;
+            state.wrapped = true;
+        } else {
+            endGame();
+            return;
+        }
     }
 
     // Self collision
@@ -112,17 +143,25 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
     state.moves++;
 
     // Food collision
+    let ate = false;
     if (head.x === state.food.x && head.y === state.food.y) {
       state.score += 10;
-      state.speed = Math.max(40, state.speed - speedIncrease);
-      onScoreUpdate(state.score);
-      spawnFood();
+      ate = true;
+      spawnFood(false);
+    } else if (state.food2 && head.x === state.food2.x && head.y === state.food2.y) {
+      state.score += 10;
+      ate = true;
+      spawnFood(true);
+    }
+
+    if (ate) {
+        onScoreUpdate(state.score);
     } else {
       state.snake.pop();
     }
 
-    tickTimer.current = setTimeout(tick, state.speed);
-  }, [isPaused, endGame, onScoreUpdate, spawnFood, speedIncrease]);
+    tickTimer.current = setTimeout(tick, getSpeedMs(speedSetting, state.moves));
+  }, [isPaused, endGame, onScoreUpdate, spawnFood, activeModifiers, speedSetting]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -149,22 +188,26 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
       ctx.stroke();
     }
 
-    // Food
-    ctx.fillStyle = '#ef4444';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.arc(
-      state.food.x * CELL_SIZE + CELL_SIZE / 2,
-      state.food.y * CELL_SIZE + CELL_SIZE / 2,
-      CELL_SIZE / 2 - 2,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
-    ctx.shadowBlur = 0; // reset shadow
+    const drawFood = (food: Point, color: string) => {
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(
+          food.x * CELL_SIZE + CELL_SIZE / 2,
+          food.y * CELL_SIZE + CELL_SIZE / 2,
+          CELL_SIZE / 2 - 2,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    };
 
-    // Snake with custom colors, skins, and eyes
+    if (state.food) drawFood(state.food, '#ef4444');
+    if (state.food2) drawFood(state.food2, '#eab308'); // Golden second food
+
+    // Snake
     state.snake.forEach((segment, i) => {
       const isHead = i === 0;
       const x = segment.x * CELL_SIZE;
@@ -244,19 +287,22 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
     const state = gameState.current;
     state.snake = [{ x: 10, y: 10 }];
     state.direction = 'RIGHT';
-    state.nextDirection = 'RIGHT';
+    state.inputBuffer = [];
     state.score = 0;
-    state.speed = baseSpeed;
     state.gameOver = false;
     state.startTime = Date.now();
     state.moves = 0;
+    state.wrapped = false;
     spawnFood();
+    if (activeModifiers.includes('DOUBLE_FOOD')) spawnFood(true);
+    else state.food2 = null;
+
     onGameStart();
     onScoreUpdate(0);
     setStarted(true);
     tick();
     render();
-  }, [baseSpeed, spawnFood, onGameStart, onScoreUpdate, tick, render]);
+  }, [spawnFood, onGameStart, onScoreUpdate, tick, render, activeModifiers]);
 
   // Input handling
   useEffect(() => {
@@ -274,8 +320,15 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
       };
 
       const newDir = dirMap[event.action];
-      if (newDir && opposite[newDir] !== state.direction) {
-        state.nextDirection = newDir;
+      if (newDir) {
+          // Buffer input to prevent self-collision from rapid double presses
+          const lastDir = state.inputBuffer.length > 0 
+            ? state.inputBuffer[state.inputBuffer.length - 1] 
+            : state.direction;
+
+          if (opposite[newDir] !== lastDir && newDir !== lastDir) {
+            state.inputBuffer.push(newDir);
+          }
       }
     });
 
@@ -303,14 +356,46 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
     };
   }, []);
 
+  const toggleModifier = (mod: Modifier) => {
+      setActiveModifiers(prev => prev.includes(mod) ? prev.filter(m => m !== mod) : [...prev, mod]);
+  };
+
   return (
     <div>
+      {/* Settings Overlay for Solo mode */}
+      {!started && (
+          <div className="mb-4 space-y-4">
+              <div className="flex flex-wrap justify-center gap-2">
+                  {(['SLOW', 'NORMAL', 'FAST', 'INSANE', 'PROGRESSIVE'] as SpeedSetting[]).map(s => (
+                       <button
+                       key={s}
+                       onClick={() => setSpeedSetting(s)}
+                       className={`px-3 py-1 rounded-full text-xs font-bold transition-colors border ${speedSetting === s ? 'bg-hrsh-accent text-white border-hrsh-accent' : 'bg-transparent text-text-muted border-border-default hover:text-text-primary'}`}
+                     >
+                         {s}
+                     </button>
+                  ))}
+              </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                  {(['WRAP', 'DOUBLE_FOOD'] as Modifier[]).map(m => (
+                       <button
+                       key={m}
+                       onClick={() => toggleModifier(m)}
+                       className={`px-3 py-1 rounded-full text-xs font-bold transition-colors border ${activeModifiers.includes(m) ? 'bg-purple-500 text-white border-purple-500' : 'bg-transparent text-text-muted border-border-default hover:text-text-primary'}`}
+                     >
+                         {m.replace('_', ' ')}
+                     </button>
+                  ))}
+              </div>
+          </div>
+      )}
+
       <div className="game-canvas-container" style={{ maxWidth: CANVAS_W, aspectRatio: '1 / 1' }}>
         <canvas
           ref={canvasRef}
           width={CANVAS_W}
           height={CANVAS_H}
-          className="rounded-xl border border-border-default shadow-lg"
+          className={`rounded-xl border shadow-lg ${activeModifiers.includes('WRAP') ? 'border-purple-500/50 shadow-purple-500/20' : 'border-border-default'}`}
           style={{ imageRendering: 'auto' }}
         />
 
@@ -339,4 +424,3 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
 }
 
 export default SnakeGame;
-

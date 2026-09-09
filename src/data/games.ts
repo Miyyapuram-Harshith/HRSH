@@ -291,6 +291,27 @@ const games: GameMetadata[] = [
     settingsSchema: GAME_SCHEMAS['word-guesser'],
     component: () => import('../games/word-guesser/WordGuesserGame'),
   },
+  {
+    id: 'imposter',
+    slug: 'imposter',
+    title: 'Imposter',
+    description: 'Find the imposter among you! Everyone gets a secret word except the imposter. Give one-word clues and vote out the suspect.',
+    shortDescription: 'Find the faker.',
+    category: 'party',
+    multiplayer: true,
+    minPlayers: 3,
+    maxPlayers: 10,
+    difficulty: 'medium',
+    modes: [
+      { id: 'classic', label: 'Classic' },
+    ],
+    controls: { keyboard: ['Typing'], touch: true },
+    tags: ['social', 'deduction', 'party'],
+    color: '#ef4444',
+    icon: '🕵️',
+    settingsSchema: GAME_SCHEMAS['imposter'],
+    component: () => import('../games/imposter/ImposterGame'),
+  },
 
   // ---- SHOWPIECE ----
   {

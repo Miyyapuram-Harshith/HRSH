@@ -3,6 +3,7 @@ import { usePlayerStore } from '../../stores/playerStore';
 import { RoomEngine } from '../../multiplayer/RoomEngine';
 import { Confetti } from '../shared/LoadingStates';
 import { useMemo } from 'react';
+import { HRSHCommentaryEngine } from '../../engine/HRSHCommentaryEngine';
 
 export function MultiplayerResultScreen({ game }: { game: any }) {
   const room = useRoomStore();
@@ -30,8 +31,21 @@ export function MultiplayerResultScreen({ game }: { game: any }) {
       });
   }, [room.players, room.gameState?.winner]);
 
-  const didIWin = sortedPlayers[0]?.id === player?.id && !room.gameState?.isDraw;
+  const myRank = sortedPlayers.findIndex(p => p.id === player?.id) + 1;
+  const didIWin = myRank === 1 && !room.gameState?.isDraw;
   const isDraw = room.gameState?.isDraw;
+
+  const commentary = useMemo(() => {
+      if (!player?.id) return '';
+      return HRSHCommentaryEngine.generateCommentary({
+          gameId: game.id,
+          result: { won: didIWin } as any,
+          moments: [],
+          rank: myRank,
+          totalPlayers: sortedPlayers.length,
+          humorLevel: 'ROAST'
+      });
+  }, [game.id, didIWin, myRank, sortedPlayers.length, player?.id]);
 
   return (
     <>
@@ -48,6 +62,12 @@ export function MultiplayerResultScreen({ game }: { game: any }) {
             </h2>
             {!isDraw && sortedPlayers[0] && !didIWin && (
               <p className="text-text-muted mt-1">{sortedPlayers[0].name} won the match</p>
+            )}
+            
+            {commentary && (
+              <div className="mt-4 p-3 bg-surface-base rounded-xl border border-border-default text-text-secondary italic text-sm">
+                 "{commentary}"
+              </div>
             )}
           </div>
 

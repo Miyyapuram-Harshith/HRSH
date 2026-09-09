@@ -153,8 +153,43 @@ export class MatchEngine {
         duration: duration,
         startTime: Date.now() + 3000 // 3 seconds buffer to allow countdowns to sync
       };
+    } else if (gameId === 'imposter') {
+        const words = ['APPLE', 'BANANA', 'ELEPHANT', 'GUITAR', 'PIRATE', 'GALAXY', 'OCEAN', 'MOUNTAIN', 'ROBOT', 'VAMPIRE'];
+        const word = words[Math.floor(Math.random() * words.length)];
+        const imposterId = playerIds[Math.floor(Math.random() * playerIds.length)];
+        
+        return {
+            phase: 'clue',
+            players: playerIds,
+            word: word,
+            imposterId: imposterId,
+            clues: {}, // playerId -> clue
+            votes: {}, // playerId -> targetPlayerId
+            winner: null,
+            imposterGuessedWord: false,
+            imposterGuess: null,
+            timeLimit: Date.now() + 60000,
+        };
     }
     return {};
+  }
+
+  static getMaskedState(gameId: string, gameState: any, playerId: string): any {
+      if (!gameState) return gameState;
+      
+      if (gameId === 'imposter') {
+          // Mask secretWord and imposterId for non-imposters during active gameplay
+          const masked = { ...gameState };
+          if (gameState.phase !== 'reveal' && gameState.phase !== 'result' && !gameState.winner) {
+              if (playerId !== gameState.imposterId) {
+                  masked.imposterId = null;
+              } else {
+                  masked.word = null;
+              }
+          }
+          return masked;
+      }
+      return gameState;
   }
 
   static processAction(gameId: string, action: any, playerId: string, gameState: any): { updated: boolean; matchEnded: boolean } {
@@ -381,6 +416,62 @@ export class MatchEngine {
           }
         }
       }
+    } else if (gameId === 'imposter') {
+        if (gameState.phase === 'clue' && action.type === 'SUBMIT_CLUE') {
+            if (!gameState.clues[playerId]) {
+                gameState.clues[playerId] = action.clue;
+                updated = true;
+                if (Object.keys(gameState.clues).length === gameState.players.length) {
+                    gameState.phase = 'discussion';
+                    gameState.timeLimit = Date.now() + 60000;
+                }
+            }
+        } else if (gameState.phase === 'discussion' && action.type === 'START_VOTING') {
+            gameState.phase = 'voting';
+            gameState.timeLimit = Date.now() + 30000;
+            updated = true;
+        } else if (gameState.phase === 'voting' && action.type === 'SUBMIT_VOTE') {
+            gameState.votes[playerId] = action.targetId;
+            updated = true;
+            if (Object.keys(gameState.votes).length === gameState.players.length) {
+                gameState.phase = 'reveal';
+            }
+        } else if (gameState.phase === 'reveal' && action.type === 'IMPOSTER_GUESS') {
+            if (playerId === gameState.imposterId) {
+                gameState.imposterGuess = action.guess;
+                if (action.guess.toUpperCase() === gameState.word.toUpperCase()) {
+                    gameState.imposterGuessedWord = true;
+                    gameState.winner = gameState.imposterId; // Imposter wins
+                } else {
+                    // Imposter loses, civilians win (represented by "CIVILIANS" or null winner depending on client logic)
+                    gameState.winner = "CIVILIANS";
+                }
+                matchEnded = true;
+                updated = true;
+            }
+        } else if (gameState.phase === 'reveal' && action.type === 'CONTINUE_REVEAL') {
+             // Tally votes
+             const counts: Record<string, number> = {};
+             for (const v of Object.values(gameState.votes)) {
+                 const target = v as string;
+                 counts[target] = (counts[target] || 0) + 1;
+             }
+             let maxVotes = 0;
+             let votedOut = null;
+             for (const [p, c] of Object.entries(counts)) {
+                 if (c > maxVotes) { maxVotes = c; votedOut = p; }
+                 else if (c === maxVotes) { votedOut = null; } // Tie
+             }
+             
+             if (votedOut === gameState.imposterId) {
+                 // Caught! Imposter has to guess word.
+             } else {
+                 // Imposter wins
+                 gameState.winner = gameState.imposterId;
+                 matchEnded = true;
+                 updated = true;
+             }
+        }
     }
 
     return { updated, matchEnded };

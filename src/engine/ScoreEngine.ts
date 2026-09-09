@@ -8,6 +8,8 @@
 import { db } from '../lib/db/database';
 import type { GameResult, GameEvent } from '../types/game';
 import type { PersonalBest, GameHistoryEntry, RecentGame } from '../types/player';
+import { MomentEngine } from './MomentEngine';
+import { HRSHCommentaryEngine } from './HRSHCommentaryEngine';
 
 type EventCallback = (event: GameEvent) => void;
 
@@ -79,12 +81,38 @@ class ScoreEngineImpl {
     // Update recent games
     await this.updateRecentGame(playerId, result.gameId);
 
+    // Detect Moments
+    const moments = MomentEngine.detectMoments(result);
+    if (isPersonalBest && !moments.some(m => m.type === 'PERSONAL_BEST')) {
+        moments.push({
+            id: `moment_${Date.now()}_pb`,
+            type: 'PERSONAL_BEST',
+            gameId: result.gameId,
+            timestamp: Date.now(),
+        });
+    }
+
+    // Generate Commentary
+    const commentary = HRSHCommentaryEngine.generateCommentary({
+        gameId: result.gameId,
+        result,
+        moments,
+        humorLevel: 'ROAST', // Defaulting to ROAST for fun, can be customized later
+    });
+
+    // Mutate result to make it accessible to UI
+    result.data = {
+        ...result.data,
+        moments,
+        commentary
+    };
+
     // Emit game events
     this.emit({
       type: 'GAME_FINISHED',
       gameId: result.gameId,
       timestamp: Date.now(),
-      data: { score: result.score, won: result.won, duration: result.duration },
+      data: { score: result.score, won: result.won, duration: result.duration, moments, commentary },
     });
 
     if (result.won) {
