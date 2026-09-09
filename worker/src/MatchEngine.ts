@@ -66,6 +66,7 @@ export class MatchEngine {
         body: [{ x: 10 + (i * 2), y: 10 + (i * 2) }],
         dir: { x: 1, y: 0 },
         nextDir: { x: 1, y: 0 },
+        inputBuffer: [],
         isDead: false,
         score: 0
       }));
@@ -306,6 +307,120 @@ export class MatchEngine {
           }
         }
       }
+    } else if (gameId === 'word-guesser') {
+      if (gameState.phase === 'picking' && action.type === 'PICK_WORD' && playerId === gameState.turn) {
+        gameState.word = action.word.toUpperCase();
+        gameState.phase = 'guessing';
+        gameState.timeRemaining = 60; // Wait, maybe not needed right now
+        return { updated: true, matchEnded: false };
+      } else if (gameState.phase === 'guessing' && action.type === 'GUESS' && playerId !== gameState.turn) {
+        const guess = action.word.toUpperCase();
+        const target = gameState.word.toUpperCase();
+        
+        let isCorrect = guess === target;
+        
+        // Calculate Wordle-style colors
+        const statuses = new Array(guess.length).fill('absent');
+        const targetChars = target.split('');
+        
+        // Pass 1: find exact matches (green)
+        for (let i = 0; i < guess.length; i++) {
+          if (guess[i] === targetChars[i]) {
+            statuses[i] = 'correct';
+            targetChars[i] = null as any; // Mark consumed
+          }
+        }
+        
+        // Pass 2: find partial matches (yellow)
+        for (let i = 0; i < guess.length; i++) {
+          if (statuses[i] !== 'correct' && targetChars.includes(guess[i])) {
+            statuses[i] = 'present';
+            targetChars[targetChars.indexOf(guess[i])] = null as any; // Mark consumed
+          }
+        }
+        
+        gameState.guesses.push({
+          playerId,
+          text: guess,
+          statuses,
+          isCorrect
+        });
+        
+        if (isCorrect) {
+          gameState.scores[playerId] += 100; // winner gets points
+          gameState.scores[gameState.turn] += 50; // picker gets some points
+          gameState.phase = 'round-end';
+          gameState.winner = playerId;
+          return { updated: true, matchEnded: true }; // for now, one round
+        }
+        
+        return { updated: true, matchEnded: false };
+      }
+      return { updated: false, matchEnded: false };
+    } else if (gameId === 'imposter') {
+      if (gameState.phase === 'clue' && action.type === 'SUBMIT_CLUE') {
+        gameState.clues[playerId] = action.clue.toUpperCase();
+        
+        // Transition to discussion if all clues submitted
+        if (Object.keys(gameState.clues).length === gameState.players.length) {
+          gameState.phase = 'discussion';
+        }
+        return { updated: true, matchEnded: false };
+      } else if (gameState.phase === 'discussion' && action.type === 'START_VOTING') {
+        gameState.phase = 'voting';
+        return { updated: true, matchEnded: false };
+      } else if (gameState.phase === 'voting' && action.type === 'SUBMIT_VOTE') {
+        gameState.votes[playerId] = action.targetId;
+        
+        // Check if all voted
+        if (Object.keys(gameState.votes).length === gameState.players.length) {
+          gameState.phase = 'reveal';
+          
+          // Tally votes
+          const counts: Record<string, number> = {};
+          for (const v of Object.values(gameState.votes)) {
+            counts[v as string] = (counts[v as string] || 0) + 1;
+          }
+          
+          // Find max
+          let maxVotes = 0;
+          let votedOut = null;
+          for (const [id, count] of Object.entries(counts)) {
+            if (count > maxVotes) {
+              maxVotes = count;
+              votedOut = id;
+            } else if (count === maxVotes) {
+              votedOut = null; // tie
+            }
+          }
+          
+          gameState.votedOut = votedOut;
+          
+          if (votedOut === gameState.imposterId) {
+            // Imposter caught! But Imposter gets one chance to guess the word
+            // Kept phase as 'reveal' because frontend handles the guessing UI inside 'reveal'
+          } else {
+            // Civilians failed
+            gameState.winner = 'IMPOSTER';
+            gameState.phase = 'result';
+            return { updated: true, matchEnded: true };
+          }
+        }
+        return { updated: true, matchEnded: false };
+      } else if (gameState.phase === 'reveal' && action.type === 'IMPOSTER_GUESS' && playerId === gameState.imposterId) {
+        const guess = action.guess.toUpperCase();
+        gameState.imposterGuess = guess;
+        if (guess === gameState.word) {
+          gameState.imposterGuessedWord = true;
+          gameState.winner = 'IMPOSTER';
+        } else {
+          gameState.imposterGuessedWord = false;
+          gameState.winner = 'CIVILIANS';
+        }
+        gameState.phase = 'result';
+        return { updated: true, matchEnded: true };
+      }
+      return { updated: false, matchEnded: false };
     } else if (gameId === 'sudoku') {
       if (action.type === 'SOLVE') {
         gameState.winner = playerId;
@@ -410,9 +525,14 @@ export class MatchEngine {
         const snake = gameState.snakes.find((s: any) => s.id === playerId);
         if (snake && !snake.isDead) {
           const { x, y } = action.dir;
-          if (snake.dir.x !== -x || snake.dir.y !== -y) {
-            snake.nextDir = { x, y };
-            // We don't broadcast immediately on change dir to reduce spam
+          const lastDir = snake.inputBuffer.length > 0 
+            ? snake.inputBuffer[snake.inputBuffer.length - 1] 
+            : snake.dir;
+            
+          if (lastDir.x !== -x || lastDir.y !== -y) {
+             if (lastDir.x !== x || lastDir.y !== y) {
+                 snake.inputBuffer.push({ x, y });
+             }
           }
         }
       }
@@ -580,6 +700,20 @@ export class MatchEngine {
       aliveSnakes++;
       lastAlive = snake;
 
+      if (snake.inputBuffer && snake.inputBuffer.length > 0) {
+        let validNext = null;
+        while (snake.inputBuffer.length > 0) {
+            const next = snake.inputBuffer.shift();
+            if (snake.dir.x !== -next.x || snake.dir.y !== -next.y) {
+                validNext = next;
+                break;
+            }
+        }
+        if (validNext) {
+            snake.nextDir = validNext;
+        }
+      }
+      
       snake.dir = { ...snake.nextDir };
       const head = { ...snake.body[0] };
       head.x += snake.dir.x;

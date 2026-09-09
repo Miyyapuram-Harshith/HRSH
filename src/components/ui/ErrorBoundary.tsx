@@ -31,7 +31,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold mb-2">HRSH ran into an unexpected error.</h1>
+          <h1 className="text-xl font-bold mb-2">HRSH hit a weird bug.</h1>
           <p className="text-sm text-text-muted mb-6 max-w-md">
             Something went wrong while rendering this component. 
             {import.meta.env.DEV && this.state.error && (
@@ -51,8 +51,16 @@ export class ErrorBoundary extends Component<Props, State> {
               onClick={() => window.location.href = '/'}
               className="px-4 py-2 bg-surface-raised border border-border-default rounded-lg text-sm font-medium hover:border-border-accent transition-colors"
             >
-              Return Home
+              Go Home
             </button>
+            {window.location.pathname.startsWith('/room/') && (
+               <button
+                 onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
+                 className="px-4 py-2 bg-surface-raised border border-border-default rounded-lg text-sm font-medium hover:border-border-accent transition-colors"
+               >
+                 Return to Room
+               </button>
+            )}
           </div>
         </div>
       );

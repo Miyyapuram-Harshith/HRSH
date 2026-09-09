@@ -90,14 +90,49 @@ function ReactionGame({ onGameStart, onGameEnd, onScoreUpdate }: GameComponentPr
         startRound();
         break;
 
-      case 'ready':
+      case 'ready': {
         // Too early!
         if (timeout.current) clearTimeout(timeout.current);
         if (fakeTimeout.current) clearTimeout(fakeTimeout.current);
-        setPhase('too-early');
+        
+        const penaltyTime = 5000;
+        const newTimes = [...times, penaltyTime];
+        setTimes(newTimes);
+        
+        const newRound = round + 1;
+        setRound(newRound);
         setFalseStarts(prev => prev + 1);
         setFastStreak(0);
+        setPhase('too-early');
+        
+        const avgTime = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
+        const score = Math.max(0, 500 - avgTime);
+        onScoreUpdate(score);
+        
+        const targetRounds = ROUNDS[mode];
+        if (newRound >= targetRounds) {
+          setPhase('finished');
+          const result: GameResult = {
+            gameId: 'reaction',
+            mode: mode.toLowerCase(),
+            score: score,
+            won: avgTime < 300,
+            duration: 0,
+            moves: targetRounds,
+            personalBest: false,
+            data: { 
+              reactionTime: avgTime, 
+              times: newTimes, 
+              bestTime: Math.min(...newTimes),
+              grade: getReactionGrade(avgTime),
+              falseStarts: falseStarts + 1
+            },
+            timestamp: Date.now(),
+          };
+          onGameEnd(result);
+        }
         break;
+      }
 
       case 'go': {
         const reactionTime = Math.round(performance.now() - goTime.current);

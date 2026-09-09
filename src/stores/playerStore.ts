@@ -43,6 +43,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   pendingDestination: null,
 
   initialize: async () => {
+    if (get().status !== 'BOOTING') return;
     set({ status: 'LOADING_PLAYER' });
     try {
       const player = await PlayerService.getOrCreatePlayer();

@@ -283,6 +283,36 @@ export default function RoomLobby() {
         {/* Main Area */}
         <div className="lg:col-span-2 space-y-6">
           
+          {room.roomCode && (
+            <div className="flex flex-col items-center bg-surface-base border border-border-default rounded-xl p-4 mb-6 shadow-md animate-[scale-in_0.3s_ease-out]">
+              <span className="text-text-muted text-sm font-bold uppercase tracking-widest mb-1">Room Code</span>
+              <div className="flex items-center gap-3">
+                <span className="text-4xl font-black text-hrsh-accent tracking-widest font-mono">
+                  {room.roomCode.match(/.{1,3}/g)?.join('-')}
+                </span>
+                <button 
+                  onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/room/${room.roomCode}`);
+                  }}
+                  className="p-2 hover:bg-surface-raised rounded-lg transition-colors text-text-muted hover:text-text-primary"
+                  title="Copy Invite Link"
+                >
+                  📋
+                </button>
+              </div>
+              {isHost && (
+                <div className="flex gap-2 mt-4 w-full sm:w-2/3">
+                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/room/${room.roomCode}?team=team-red`)} className="flex-1 py-1.5 bg-status-danger/10 text-status-danger border border-status-danger/20 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-status-danger/20 transition-colors">
+                    Copy Team Red Link
+                  </button>
+                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/room/${room.roomCode}?team=team-blue`)} className="flex-1 py-1.5 bg-hrsh-accent/10 text-hrsh-accent border border-hrsh-accent/20 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-hrsh-accent/20 transition-colors">
+                    Copy Team Blue Link
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          
           {showSettings && isHost ? (
             <div className="bg-surface-raised border border-border-default rounded-2xl p-6">
               <h2 className="text-lg font-bold mb-4">Edit Room Settings</h2>

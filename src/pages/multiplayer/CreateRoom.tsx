@@ -29,8 +29,9 @@ export default function CreateRoom() {
 
       const data = await res.json();
       
-      if (!data.success || !data.roomId || typeof data.roomId !== 'string') {
-        throw new Error(data.error || 'Invalid room response from server');
+      if (!data.success || !data.roomId || typeof data.roomId !== 'string' || !data.roomCode) {
+        console.error('[CreateRoom] Malformed response:', data);
+        throw new Error(data.error || 'Invalid room response from server: Missing room details.');
       }
 
       const roomId = data.roomId.toUpperCase();

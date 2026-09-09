@@ -88,7 +88,7 @@ export default function SnakeArenaGame({ multiplayerState, onMultiplayerAction }
       </div>
 
       {/* Arena Board */}
-      <div className="bg-surface-base p-1 sm:p-2 rounded-2xl shadow-2xl border border-border-default relative select-none w-full max-w-[600px] aspect-square overflow-hidden">
+      <div className="bg-surface-base p-1 sm:p-2 rounded-2xl shadow-2xl border border-border-default relative select-none w-full max-w-[600px] aspect-square overflow-hidden" style={{ touchAction: 'none', overscrollBehavior: 'none' }}>
         {/* Render Snake Segments */}
         {snakes.map((s: any) => (
           !s.isDead && Array.isArray(s.body) && s.body.map((segment: any, i: number) => {

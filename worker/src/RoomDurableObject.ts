@@ -767,6 +767,7 @@ export class RoomDurableObject {
           type: 'ROOM_STATE',
           state: {
             roomId: this.roomId,
+            roomCode: this.roomCode,
             version: this.version,
             status: this.status,
             settings: this.settings,

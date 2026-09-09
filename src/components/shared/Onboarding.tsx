@@ -28,8 +28,6 @@ export function Onboarding() {
     setError(null);
 
     try {
-      await saveName(trimmed);
-
       // Check if there's a preserved destination (e.g., /room/XYZ)
       const currentPath = window.location.pathname;
       const target = pendingDestination || (currentPath !== '/' && currentPath !== '' ? currentPath : null);
@@ -38,6 +36,8 @@ export function Onboarding() {
         setPendingDestination(null);
         navigate(target, { replace: true });
       }
+
+      await saveName(trimmed);
     } catch (err: any) {
       console.error('[Onboarding] Error creating player profile:', err);
       setError(err?.message || 'Could not save player profile. Please try again.');

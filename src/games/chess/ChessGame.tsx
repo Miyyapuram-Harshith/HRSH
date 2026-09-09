@@ -63,6 +63,7 @@ export default function ChessGame({
     try {
       const result = gameCopy.move(move);
       if (result) {
+        setFen(gameCopy.fen());
         // Send move to server
         onMultiplayerAction({ type: 'MOVE', move: result.san });
         return true;

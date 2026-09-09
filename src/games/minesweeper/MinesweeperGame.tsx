@@ -75,7 +75,8 @@ function floodFill(board: Cell[][], r: number, c: number, rows: number, cols: nu
   return newBoard;
 }
 
-function MinesweeperGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: GameComponentProps) {
+function MinesweeperGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplayerState, onMultiplayerAction, onMatchProgress }: GameComponentProps) {
+  const isMultiplayer = !!multiplayerState;
   const { settings } = usePlayerStore();
   const customization = (settings as any)?.customizations?.['minesweeper'] || {};
   const flagStyle = customization.flagStyle || 'flag';
@@ -140,18 +141,23 @@ function MinesweeperGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
       setGameOver(true);
       if (timerRef.current) clearInterval(timerRef.current);
 
-      const result: GameResult = {
-        gameId: 'minesweeper',
-        mode: difficulty,
-        score: Math.max(0, preset.mines * 100 - time * 10),
-        won: false,
-        duration: Date.now() - startTime.current,
-        moves: movesRef.current,
-        personalBest: false,
-        data: { difficulty, time },
-        timestamp: Date.now(),
-      };
-      onGameEnd(result);
+      if (isMultiplayer && onMultiplayerAction) {
+        onMultiplayerAction({ type: 'LOSE' });
+        // Don't auto-end match in multiplayer
+      } else {
+        const result: GameResult = {
+          gameId: 'minesweeper',
+          mode: difficulty,
+          score: Math.max(0, preset.mines * 100 - time * 10),
+          won: false,
+          duration: Date.now() - startTime.current,
+          moves: movesRef.current,
+          personalBest: false,
+          data: { difficulty, time },
+          timestamp: Date.now(),
+        };
+        onGameEnd(result);
+      }
       return;
     }
 
@@ -161,30 +167,40 @@ function MinesweeperGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
 
     // Check win: all non-mine cells revealed
     const totalCells = preset.rows * preset.cols;
+    const safeCells = totalCells - preset.mines;
     const revealedCount = newBoard.flat().filter((c) => c.revealed).length;
     const score = revealedCount * 10;
-    onScoreUpdate(score);
+    
+    if (!isMultiplayer) {
+      onScoreUpdate(score);
+    } else if (onMatchProgress) {
+      onMatchProgress(revealedCount / safeCells, time);
+    }
 
-    if (revealedCount === totalCells - preset.mines) {
+    if (revealedCount === safeCells) {
       setGameOver(true);
       setWon(true);
       if (timerRef.current) clearInterval(timerRef.current);
 
-      const finalScore = Math.max(100, preset.mines * 100 - time * 5);
-      const result: GameResult = {
-        gameId: 'minesweeper',
-        mode: difficulty,
-        score: finalScore,
-        won: true,
-        duration: Date.now() - startTime.current,
-        moves: movesRef.current,
-        personalBest: false,
-        data: { difficulty, time },
-        timestamp: Date.now(),
-      };
-      onGameEnd(result);
+      if (isMultiplayer && onMultiplayerAction) {
+        onMultiplayerAction({ type: 'WIN', time });
+      } else {
+        const finalScore = Math.max(100, preset.mines * 100 - time * 5);
+        const result: GameResult = {
+          gameId: 'minesweeper',
+          mode: difficulty,
+          score: finalScore,
+          won: true,
+          duration: Date.now() - startTime.current,
+          moves: movesRef.current,
+          personalBest: false,
+          data: { difficulty, time },
+          timestamp: Date.now(),
+        };
+        onGameEnd(result);
+      }
     }
-  }, [board, gameOver, isPaused, preset, difficulty, time, onGameStart, onGameEnd, onScoreUpdate]);
+  }, [board, gameOver, isPaused, preset, difficulty, time, onGameStart, onGameEnd, onScoreUpdate, isMultiplayer, onMultiplayerAction, onMatchProgress]);
 
   const handleFlag = useCallback((e: React.MouseEvent | React.TouchEvent, r: number, c: number) => {
     e.preventDefault();

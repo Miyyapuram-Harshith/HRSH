@@ -99,40 +99,77 @@ export default function Leaderboard() {
           ))}
         </div>
       ) : entries.length > 0 ? (
-        <div className="bg-surface-raised border border-border-default rounded-2xl overflow-hidden">
-          <div className="divide-y divide-border-default">
-            {entries.map((entry) => {
-              const isMe = entry.playerId === player?.id;
-              return (
-                <div
-                  key={`${entry.playerId}-${entry.rank}`}
-                  className={`flex items-center justify-between px-4 py-3 transition-colors ${
-                    isMe ? 'bg-hrsh-accent/5' : 'hover:bg-surface-overlay'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 text-center font-bold ${entry.rank <= 3 ? 'text-lg' : 'text-sm text-text-muted'}`}>
-                      {medalEmoji(entry.rank)}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium flex items-center gap-1.5">
-                        {entry.playerName}
-                        {isMe && <span className="text-[10px] text-hrsh-accent font-semibold">(YOU)</span>}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="font-mono text-sm font-bold tabular-nums"
-                      style={{ color: selectedGame?.color }}
-                    >
-                      {entry.score.toLocaleString()}
-                    </span>
-                  </div>
+        <div className="space-y-6">
+          {/* #1 Player Hero Banner */}
+          <div className="bg-gradient-to-br from-hrsh-accent/20 via-surface-raised to-surface-base border-2 border-hrsh-accent/50 rounded-2xl p-6 shadow-[0_0_30px_rgba(var(--hrsh-accent-rgb),0.15)] relative overflow-hidden animate-[slide-up_0.4s_ease-out]">
+            <div className="absolute top-0 right-0 p-4 opacity-10 text-8xl">🥇</div>
+            <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center text-4xl shadow-xl shadow-yellow-500/20 border-4 border-surface-base">
+                  {entries[0].playerName[0]?.toUpperCase()}
                 </div>
-              );
-            })}
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h2 className="text-3xl font-black tracking-tight">{entries[0].playerName}</h2>
+                    {Date.now() - entries[0].achievedAt < 86400000 && (
+                      <span className="px-2 py-0.5 bg-status-danger/20 text-status-danger text-[10px] font-bold uppercase rounded border border-status-danger/30">🔥 On Fire</span>
+                    )}
+                  </div>
+                  <p className="text-hrsh-accent font-medium italic">"Absolute menace. The leaderboard has a new landlord."</p>
+                </div>
+              </div>
+              <div className="text-center md:text-right bg-surface-overlay/80 backdrop-blur-sm p-4 rounded-xl border border-border-default/50 min-w-[120px]">
+                <div className="text-xs text-text-muted font-bold uppercase tracking-wider mb-1">High Score</div>
+                <div className="text-3xl font-black text-hrsh-accent font-mono">{entries[0].score.toLocaleString()}</div>
+                <div className="text-[10px] text-text-muted mt-1">{new Date(entries[0].achievedAt).toLocaleDateString()}</div>
+              </div>
+            </div>
           </div>
+
+          {/* Remaining Players */}
+          {entries.length > 1 && (
+            <div className="bg-surface-raised border border-border-default rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-surface-overlay border-b border-border-default text-xs uppercase tracking-wider text-text-muted">
+                      <th className="px-6 py-4 font-semibold">Rank</th>
+                      <th className="px-6 py-4 font-semibold">Player</th>
+                      <th className="px-6 py-4 font-semibold text-right">Score</th>
+                      <th className="px-6 py-4 font-semibold text-right">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-default text-sm">
+                    {entries.slice(1).map((entry) => (
+                      <tr 
+                        key={entry.playerId} 
+                        className={`hover:bg-surface-hover transition-colors ${entry.playerId === player?.id ? 'bg-hrsh-accent/5' : ''}`}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 font-bold text-text-muted">
+                            {medalEmoji(entry.rank)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            {entry.playerName}
+                            {entry.playerId === player?.id && <span className="text-xs text-text-muted font-normal">(You)</span>}
+                            {entry.rank === 2 && <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded border border-blue-500/20 uppercase font-bold">🥶 Struggling</span>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-right font-mono text-hrsh-accent">
+                          {entry.score.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-text-muted text-right">
+                          {new Date(entry.achievedAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <EmptyState

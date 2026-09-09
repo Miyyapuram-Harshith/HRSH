@@ -34,6 +34,7 @@ export type RoomStatus = 'WAITING' | 'READY' | 'COUNTDOWN' | 'PLAYING' | 'FINISH
 
 interface RoomState {
   roomId: string | null;
+  roomCode: string | null;
   version: number;
   status: RoomStatus;
   settings: RoomSettings | null;
@@ -101,6 +102,7 @@ export function normalizeRoomSnapshot(raw: Partial<RoomState>): Partial<RoomStat
 
 export const useRoomStore = create<RoomState>((set) => ({
   roomId: null,
+  roomCode: null,
   version: 0,
   status: 'WAITING',
   settings: null,
@@ -121,6 +123,7 @@ export const useRoomStore = create<RoomState>((set) => ({
   setError: (error) => set({ error }),
   reset: () => set({
     roomId: null,
+    roomCode: null,
     version: 0,
     status: 'WAITING',
     settings: null,

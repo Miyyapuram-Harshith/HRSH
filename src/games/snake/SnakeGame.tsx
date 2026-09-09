@@ -390,7 +390,7 @@ function SnakeGame({ mode, onGameStart, onGameEnd, onScoreUpdate, isPaused }: Ga
           </div>
       )}
 
-      <div className="game-canvas-container" style={{ maxWidth: CANVAS_W, aspectRatio: '1 / 1' }}>
+      <div className="game-canvas-container relative select-none" style={{ maxWidth: CANVAS_W, aspectRatio: '1 / 1', touchAction: 'none', overscrollBehavior: 'none' }}>
         <canvas
           ref={canvasRef}
           width={CANVAS_W}
