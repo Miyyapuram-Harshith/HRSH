@@ -32,7 +32,10 @@ export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPla
   };
 
   const moments = result.data?.moments as any[] | undefined;
-  const commentary = result.data?.commentary as string[] | undefined;
+  const commentaryRaw = result.data?.commentary;
+  const commentary = Array.isArray(commentaryRaw) 
+    ? commentaryRaw 
+    : (typeof commentaryRaw === 'string' ? [commentaryRaw] : undefined);
 
   return (
     <>
