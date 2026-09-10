@@ -28,9 +28,31 @@ class ScoreEngineImpl {
   }
 
   /**
+   * Normalizes a raw GameResult into a safe, predictable structure.
+   */
+  normalizeGameResult(result: GameResult): GameResult {
+    return {
+      ...result,
+      score: Number.isFinite(result.score) ? result.score : 0,
+      duration: Number.isFinite(result.duration) ? result.duration : 0,
+      moves: Number.isFinite(result.moves) ? result.moves : 0,
+      outcome: result.won ? 'won' : 'finished',
+      data: result.data || {},
+      stats: result.stats || result.data || {},
+      ranking: result.ranking || null,
+      leaderboard: Array.isArray(result.leaderboard) ? result.leaderboard : [],
+      achievements: Array.isArray(result.achievements) ? result.achievements : [],
+      moments: Array.isArray(result.moments) ? result.moments : [],
+      commentary: result.commentary || null,
+    };
+  }
+
+  /**
    * Record a completed game result. Returns whether it was a personal best.
    */
-  async recordResult(playerId: string, result: GameResult): Promise<boolean> {
+  async recordResult(playerId: string, rawResult: GameResult): Promise<{ normalizedResult: GameResult, isPersonalBest: boolean }> {
+    const result = this.normalizeGameResult(rawResult);
+
     // Check for personal best
     const currentBest = await this.getPersonalBest(playerId, result.gameId, result.mode);
     const isPersonalBest = !currentBest || result.score > currentBest.score;
@@ -100,7 +122,9 @@ class ScoreEngineImpl {
         humorLevel: 'ROAST', // Defaulting to ROAST for fun, can be customized later
     });
 
-    // Mutate result to make it accessible to UI
+    // Mutate result to make it accessible to UI safely
+    result.moments = moments;
+    result.commentary = commentary;
     result.data = {
         ...result.data,
         moments,
@@ -124,7 +148,8 @@ class ScoreEngineImpl {
       });
     }
 
-    return isPersonalBest;
+    // Return the normalized result along with isPersonalBest
+    return { normalizedResult: result, isPersonalBest };
   }
 
   async getPersonalBest(playerId: string, gameId: string, mode: string): Promise<PersonalBest | undefined> {

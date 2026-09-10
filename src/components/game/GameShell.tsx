@@ -63,39 +63,55 @@ export function GameShell({ game, onQuit, children }: GameShellProps) {
     AnalyticsEngine.track('GAME_START', { gameId: game.id });
   }, [game.id, startGame]);
 
-  const handleGameEnd = useCallback(async (result: GameResult) => {
+  const handleGameEnd = useCallback(async (rawResult: GameResult) => {
     if (!player) return;
 
-    const isPersonalBest = await ScoreEngine.recordResult(player.id, result);
-    endGame(result, isPersonalBest);
+    try {
+      const { normalizedResult: result, isPersonalBest } = await ScoreEngine.recordResult(player.id, rawResult);
+      endGame(result, isPersonalBest);
 
-    // Calculate XP
-    let xp = 10; // base
-    if (result.won) xp += 15;
-    xp += Math.floor(result.score / 100);
-    setXpGained(xp);
+      // Calculate XP
+      let xp = 10; // base
+      if (result.won) xp += 15;
+      xp += Math.floor((result.score || 0) / 100);
+      setXpGained(xp);
 
-    // Update streak
-    await updateStreak();
+      // Update streak
+      try {
+        await updateStreak();
+      } catch (e) {
+        console.error("Streak update failed:", e);
+      }
 
-    // Check achievements
-    const eventParams = {
-      type: result.won ? 'GAME_WON' : 'GAME_FINISHED',
-      gameId: game.id,
-      timestamp: Date.now(),
-      data: { score: result.score, duration: result.duration, won: result.won },
-    } as const;
+      // Check achievements
+      const eventParams = {
+        type: result.won ? 'GAME_WON' : 'GAME_FINISHED',
+        gameId: game.id,
+        timestamp: Date.now(),
+        data: { score: result.score, duration: result.duration, won: result.won },
+      } as const;
 
-    const unlocked = await AchievementEngine.processEvent(player.id, eventParams);
-    await LeagueEngine.processEvent(player.id, eventParams);
-    await QuestEngine.processEvent(player.id, eventParams);
+      try {
+        const unlocked = await AchievementEngine.processEvent(player.id, eventParams);
+        await LeagueEngine.processEvent(player.id, eventParams);
+        await QuestEngine.processEvent(player.id, eventParams);
 
-    for (const achievement of unlocked) {
-      addAchievement(achievement);
+        for (const achievement of unlocked) {
+          addAchievement(achievement);
+        }
+      } catch (err) {
+        console.error("Achievement processing failed:", err);
+      }
+
+      AnalyticsEngine.track('GAME_FINISH', { gameId: game.id, score: result.score, won: result.won });
+      setShowResult(true);
+    } catch (err) {
+      console.error("Result processing failed:", err);
+      // Fallback: at least show result screen with raw data normalized locally
+      const fallbackResult = ScoreEngine.normalizeGameResult(rawResult);
+      endGame(fallbackResult, false);
+      setShowResult(true);
     }
-
-    AnalyticsEngine.track('GAME_FINISH', { gameId: game.id, score: result.score, won: result.won });
-    setShowResult(true);
   }, [player, game.id, endGame, updateStreak, addAchievement]);
 
   const handleScoreUpdate = useCallback((newScore: number) => {

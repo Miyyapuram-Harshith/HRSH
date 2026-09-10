@@ -12,13 +12,13 @@ export const TypingLeaderboard = memo(function TypingLeaderboard({ players, myPl
   const room = useRoomStore();
   const { teamsEnabled, teams } = room;
 
-  // Memoize sorted players to avoid recalculating unnecessarily
   const sortedPlayers = useMemo(() => {
-    return [...players]
-      .filter(p => !p.isSpectator)
+    const safePlayers = Array.isArray(players) ? players : [];
+    return [...safePlayers]
+      .filter(p => !p?.isSpectator)
       .sort((a, b) => {
-        if (a.rank && b.rank) return a.rank - b.rank;
-        return (b.progress || 0) - (a.progress || 0);
+        if (a?.rank && b?.rank) return a.rank - b.rank;
+        return (b?.progress || 0) - (a?.progress || 0);
       });
   }, [players]);
 
@@ -26,7 +26,7 @@ export const TypingLeaderboard = memo(function TypingLeaderboard({ players, myPl
   const displayPlayers = useMemo(() => {
     if (sortedPlayers.length <= maxDisplay) return sortedPlayers;
 
-    const myIndex = sortedPlayers.findIndex(p => p.id === myPlayerId);
+    const myIndex = sortedPlayers.findIndex(p => p?.id === myPlayerId);
     
     // Always show top 3
     const top3 = sortedPlayers.slice(0, 3);
@@ -46,8 +46,8 @@ export const TypingLeaderboard = memo(function TypingLeaderboard({ players, myPl
     }
     combined.push(...mySurroundings);
     
-    const remaining = sortedPlayers.length - combined.filter(p => !p.id.startsWith('ellipsis')).length;
-    if (remaining > 0 && combined[combined.length - 1].id !== sortedPlayers[sortedPlayers.length - 1].id) {
+    const remaining = sortedPlayers.length - combined.filter(p => p?.id && !p.id.startsWith('ellipsis')).length;
+    if (remaining > 0 && combined.length > 0 && sortedPlayers.length > 0 && combined[combined.length - 1].id !== sortedPlayers[sortedPlayers.length - 1].id) {
        combined.push({ id: 'ellipsis-2', name: `${remaining} more racers`, isSpectator: true } as any);
     }
     

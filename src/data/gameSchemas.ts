@@ -277,7 +277,13 @@ export const reactionSchema: GameSettingDefinition[] = [
 ];
 
 export const imposterSchema: GameSettingDefinition[] = [
-  { key: 'wordCategory', type: 'select', label: 'Word Category', defaultValue: 'general', options: [{label: 'General', value: 'general'}] }
+  { key: 'impostersCount', type: 'select', label: 'Number of Imposters', defaultValue: 1, options: [{label: '1 Imposter', value: 1}, {label: '2 Imposters', value: 2}, {label: 'Random', value: 'random'}] },
+  { key: 'clueTime', type: 'select', label: 'Clue Time (s)', defaultValue: 60, options: [{label: '15s', value: 15}, {label: '30s', value: 30}, {label: '45s', value: 45}, {label: '60s', value: 60}, {label: '90s', value: 90}] },
+  { key: 'discussionTime', type: 'select', label: 'Discussion Time (s)', defaultValue: 60, options: [{label: '15s', value: 15}, {label: '30s', value: 30}, {label: '45s', value: 45}, {label: '60s', value: 60}, {label: '90s', value: 90}, {label: '120s', value: 120}] },
+  { key: 'votingTime', type: 'select', label: 'Voting Time (s)', defaultValue: 30, options: [{label: '15s', value: 15}, {label: '30s', value: 30}, {label: '45s', value: 45}, {label: '60s', value: 60}] },
+  { key: 'wordDifficulty', type: 'select', label: 'Word Difficulty', defaultValue: 'normal', options: [{label: 'Easy', value: 'easy'}, {label: 'Normal', value: 'normal'}, {label: 'Hard', value: 'hard'}, {label: 'Expert', value: 'expert'}] },
+  { key: 'wordCategory', type: 'select', label: 'Word Category', defaultValue: 'general', options: [{label: 'General', value: 'general'}, {label: 'Animals', value: 'animals'}, {label: 'Food', value: 'food'}, {label: 'Places', value: 'places'}] },
+  { key: 'anonymousVoting', type: 'toggle', label: 'Anonymous Voting', defaultValue: false }
 ];
 
 export const GAME_SCHEMAS: Record<string, GameSettingDefinition[]> = {

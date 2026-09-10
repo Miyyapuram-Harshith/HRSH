@@ -123,6 +123,16 @@ export interface GameResult {
   personalBest: boolean;
   data: Record<string, unknown>; // Game-specific result data
   timestamp: number;
+
+  // Normalized Boundary Fields
+  outcome?: 'won' | 'lost' | 'draw' | 'finished';
+  primaryMetric?: { type: string; value: number; formatted?: string };
+  stats?: Record<string, any>;
+  ranking?: { rank: number; totalPlayers: number } | null;
+  leaderboard?: any[];
+  achievements?: any[];
+  commentary?: string | string[] | null;
+  moments?: any[];
 }
 
 export interface GameComponentProps {

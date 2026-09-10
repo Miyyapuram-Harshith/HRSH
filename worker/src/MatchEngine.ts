@@ -161,7 +161,7 @@ export class MatchEngine {
         const imposterId = playerIds[Math.floor(Math.random() * playerIds.length)];
         
         return {
-            phase: 'clue',
+            phase: 'role_reveal',
             players: playerIds,
             word: word,
             imposterId: imposterId,
@@ -170,7 +170,8 @@ export class MatchEngine {
             winner: null,
             imposterGuessedWord: false,
             imposterGuess: null,
-            timeLimit: Date.now() + 60000,
+            timeLimit: Date.now() + 5000,
+            settings: settings,
         };
     }
     return {};
@@ -199,7 +200,7 @@ export class MatchEngine {
     let matchEnded = false;
 
     // Turn check
-    if (gameId !== 'snake-arena' && gameId !== 'typing') {
+    if (gameId !== 'snake-arena' && gameId !== 'typing' && gameId !== 'imposter') {
        if (gameState.turn !== playerId) return { updated: false, matchEnded: false };
     }
 
@@ -540,22 +541,27 @@ export class MatchEngine {
     } else if (gameId === 'imposter') {
         if (gameState.phase === 'clue' && action.type === 'SUBMIT_CLUE') {
             if (!gameState.clues[playerId]) {
-                gameState.clues[playerId] = action.clue;
-                updated = true;
-                if (Object.keys(gameState.clues).length === gameState.players.length) {
-                    gameState.phase = 'discussion';
-                    gameState.timeLimit = Date.now() + 60000;
+                const clue = typeof action.clue === 'string' ? action.clue.trim() : '';
+                const isDuplicate = Object.values(gameState.clues).some(c => (c as string).toUpperCase() === clue.toUpperCase());
+                if (clue.length > 0 && clue.length <= 20 && clue.toUpperCase() !== gameState.word.toUpperCase() && !isDuplicate) {
+                    gameState.clues[playerId] = clue;
+                    updated = true;
+                    if (Object.keys(gameState.clues).length === gameState.players.length) {
+                        gameState.phase = 'discussion';
+                        gameState.timeLimit = Date.now() + (gameState.settings?.gameSettings?.discussionTime || 60) * 1000;
+                    }
                 }
             }
         } else if (gameState.phase === 'discussion' && action.type === 'START_VOTING') {
             gameState.phase = 'voting';
-            gameState.timeLimit = Date.now() + 30000;
+            gameState.timeLimit = Date.now() + (gameState.settings?.gameSettings?.votingTime || 30) * 1000;
             updated = true;
         } else if (gameState.phase === 'voting' && action.type === 'SUBMIT_VOTE') {
             gameState.votes[playerId] = action.targetId;
             updated = true;
             if (Object.keys(gameState.votes).length === gameState.players.length) {
                 gameState.phase = 'reveal';
+                gameState.timeLimit = Date.now() + 15000;
             }
         } else if (gameState.phase === 'reveal' && action.type === 'IMPOSTER_GUESS') {
             if (playerId === gameState.imposterId) {
@@ -618,6 +624,51 @@ export class MatchEngine {
         return { updated: true, matchEnded: true };
       }
       return { updated: false, matchEnded: false }; // No state updates to broadcast continuously, we assume clients predict time
+    } else if (gameId === 'imposter') {
+      const now = Date.now();
+      if (gameState.timeLimit && now >= gameState.timeLimit) {
+        if (gameState.phase === 'role_reveal') {
+          gameState.phase = 'clue';
+          gameState.timeLimit = now + (gameState.settings?.gameSettings?.clueTime || 60) * 1000;
+          return { updated: true, matchEnded: false };
+        } else if (gameState.phase === 'clue') {
+          gameState.phase = 'discussion';
+          gameState.timeLimit = now + (gameState.settings?.gameSettings?.discussionTime || 60) * 1000;
+          return { updated: true, matchEnded: false };
+        } else if (gameState.phase === 'discussion') {
+          gameState.phase = 'voting';
+          gameState.timeLimit = now + (gameState.settings?.gameSettings?.votingTime || 30) * 1000;
+          return { updated: true, matchEnded: false };
+        } else if (gameState.phase === 'voting') {
+          gameState.phase = 'reveal';
+          gameState.timeLimit = now + 15000; // Time for reveal animation
+          return { updated: true, matchEnded: false };
+        } else if (gameState.phase === 'reveal' && gameState.imposterGuess === null) {
+          // Time ran out for imposter to guess, or reveal animation finished and no guess needed
+          // Tally votes to see if imposter was caught
+          const counts: Record<string, number> = {};
+          for (const v of Object.values(gameState.votes)) {
+            const target = v as string;
+            counts[target] = (counts[target] || 0) + 1;
+          }
+          let maxVotes = 0;
+          let votedOut = null;
+          for (const [p, c] of Object.entries(counts)) {
+            if (c > maxVotes) { maxVotes = c; votedOut = p; }
+            else if (c === maxVotes) { votedOut = null; }
+          }
+          
+          if (votedOut === gameState.imposterId && !gameState.imposterGuessedWord) {
+             // Imposter was caught but didn't guess in time
+             gameState.winner = 'CIVILIANS';
+             return { updated: true, matchEnded: true };
+          } else if (votedOut !== gameState.imposterId) {
+             gameState.winner = gameState.imposterId;
+             return { updated: true, matchEnded: true };
+          }
+        }
+      }
+      return { updated: false, matchEnded: false };
     }
     return { updated: false, matchEnded: false };
   }

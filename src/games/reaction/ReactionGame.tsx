@@ -105,8 +105,8 @@ function ReactionGame({ onGameStart, onGameEnd, onScoreUpdate }: GameComponentPr
         setFastStreak(0);
         setPhase('too-early');
         
-        const avgTime = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
-        const score = Math.max(0, 500 - avgTime);
+        const avgTime = newTimes.length > 0 ? Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length) : 0;
+        const score = Number.isFinite(avgTime) ? Math.max(0, 500 - avgTime) : 0;
         onScoreUpdate(score);
         
         const targetRounds = ROUNDS[mode];
@@ -145,8 +145,8 @@ function ReactionGame({ onGameStart, onGameEnd, onScoreUpdate }: GameComponentPr
         if (reactionTime < 220) setFastStreak(prev => prev + 1);
         else setFastStreak(0);
 
-        const avgTime = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
-        const score = Math.max(0, 500 - avgTime);
+        const avgTime = newTimes.length > 0 ? Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length) : 0;
+        const score = Number.isFinite(avgTime) ? Math.max(0, 500 - avgTime) : 0;
         onScoreUpdate(score);
 
         const targetRounds = ROUNDS[mode];

@@ -576,7 +576,7 @@ export class RoomDurableObject {
         }
         if (updated) this.broadcastState();
       }, 150);
-    } else if (this.settings?.gameId === 'chess') {
+    } else if (this.settings?.gameId === 'chess' || this.settings?.gameId === 'imposter') {
       if (this.gameTickTimer) clearInterval(this.gameTickTimer);
       this.gameTickTimer = setInterval(() => {
         const { updated, matchEnded } = MatchEngine.tick(this.settings?.gameId || '', this.gameState);
@@ -632,7 +632,11 @@ export class RoomDurableObject {
         
         // Add XP to participants (e.g. 50 for win, 10 for loss/draw)
         playersData.forEach(p => {
-          const xp = p.id === this.gameState.winner ? 50 : 10;
+          let xp = 10;
+          if (this.gameState.winner) {
+             if (p.id === this.gameState.winner) xp = 50;
+             else if (this.settings?.gameId === 'imposter' && this.gameState.winner === 'CIVILIANS' && p.id !== this.gameState.imposterId) xp = 50;
+          }
           db.addXP(p.id, xp).catch(err => console.error("Failed to add XP:", err));
         });
       }

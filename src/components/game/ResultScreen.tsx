@@ -12,6 +12,157 @@ interface ResultScreenProps {
   onPlayAgain: () => void;
 }
 
+const formatDuration = (ms: number) => {
+  if (!Number.isFinite(ms)) return '0s';
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const remainder = s % 60;
+  return m > 0 ? `${m}m ${remainder}s` : `${s}s`;
+};
+
+// Isolated Components
+const ResultSummary = ({ result, game, isPersonalBest }: any) => {
+  const score = Number.isFinite(result.score) ? result.score : 0;
+  return (
+    <div className="mb-5">
+      <div className="text-3xl mb-2 animate-[bounce-in_0.5s_ease-out]">
+        {result.won ? '🎉' : '💪'}
+      </div>
+      <h2 className="text-xl font-bold mb-1">
+        {result.won ? 'You Win!' : 'Game Over'}
+      </h2>
+      <div
+        className="text-4xl font-bold font-mono tabular-nums animate-[pop_0.4s_ease-out]"
+        style={{ color: game.color }}
+      >
+        {score.toLocaleString()}
+      </div>
+      {isPersonalBest && (
+        <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-status-success/10 text-status-success rounded-full text-xs font-semibold animate-[pop_0.5s_ease-out]">
+          ⭐ New Personal Best!
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ResultStats = ({ result }: any) => {
+  const duration = Number.isFinite(result.duration) ? result.duration : 0;
+  const moves = Number.isFinite(result.moves) ? result.moves : 0;
+  return (
+    <div className="grid grid-cols-2 gap-3 mb-5">
+      <div className="bg-surface-base rounded-xl p-3">
+        <div className="text-text-muted text-xs mb-0.5">Duration</div>
+        <div className="font-mono text-sm font-semibold">{formatDuration(duration)}</div>
+      </div>
+      <div className="bg-surface-base rounded-xl p-3">
+        <div className="text-text-muted text-xs mb-0.5">Moves</div>
+        <div className="font-mono text-sm font-semibold">{moves || '—'}</div>
+      </div>
+    </div>
+  );
+};
+
+const ResultGameData = ({ result, game }: any) => {
+  const data = result.data || result.stats || {};
+  if (!data || Object.keys(data).length === 0) return null;
+
+  return (
+    <div className="mb-5 text-sm">
+      {'wpm' in data && Boolean(data.wpm) && (
+        <div className="text-text-secondary">
+          <span className="font-mono font-bold" style={{ color: game.color }}>{String(data.wpm)}</span> WPM
+          {'accuracy' in data && Boolean(data.accuracy) && <span className="text-text-muted"> · {String(data.accuracy)}% accuracy</span>}
+        </div>
+      )}
+      {'reactionTime' in data && Boolean(data.reactionTime) && (
+        <div className="text-text-secondary">
+          <span className="font-mono font-bold" style={{ color: game.color }}>{String(data.reactionTime)}</span>ms average
+        </div>
+      )}
+      {'bestTile' in data && Boolean(data.bestTile) && (
+        <div className="text-text-secondary">
+          Best tile: <span className="font-mono font-bold" style={{ color: game.color }}>{String(data.bestTile)}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ResultMoments = ({ moments }: { moments: any[] }) => {
+  if (!Array.isArray(moments) || moments.length === 0) return null;
+  return (
+    <div className="mb-4 flex flex-wrap justify-center gap-2">
+      {moments.map((m: any, i: number) => {
+        if (!m || typeof m.type !== 'string') return null;
+        return (
+          <span key={m.id || i} className="px-2 py-1 bg-surface-base border border-border-default rounded-full text-xs font-bold text-hrsh-accent animate-[scale-in_0.3s_ease-out]">
+            ✨ {m.type.replace('_', ' ')}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
+const ResultCommentary = ({ commentary }: { commentary: string[] }) => {
+  if (!Array.isArray(commentary) || commentary.length === 0) return null;
+  return (
+    <div className="mb-6 p-4 bg-surface-base rounded-xl border border-border-default italic text-sm text-text-secondary">
+      {commentary.map((line: string, i: number) => {
+        if (typeof line !== 'string') return null;
+        return <p key={i} className={i > 0 ? "mt-2" : ""}>"{line}"</p>;
+      })}
+    </div>
+  );
+};
+
+const ResultActions = ({ onPlayAgain, game, result }: any) => {
+  const score = Number.isFinite(result.score) ? result.score : 0;
+  return (
+    <div className="space-y-4">
+      <button
+        onClick={onPlayAgain}
+        autoFocus
+        className="w-full px-4 py-3.5 btn-3d btn-3d-primary text-sm"
+      >
+        Play Again
+      </button>
+      
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => {
+            import('../../engine/ShareEngine').then(({ ShareEngine }) => {
+              ShareEngine.shareResult(game.id, score, result.data || {});
+            }).catch(console.error);
+          }}
+          className="px-4 py-3 btn-3d btn-3d-secondary text-xs"
+        >
+          📤 Share
+        </button>
+        <button
+          onClick={() => {
+            const challengeId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            import('../../engine/ShareEngine').then(({ ShareEngine }) => {
+              ShareEngine.shareChallenge(game.id, challengeId);
+            }).catch(console.error);
+          }}
+          className="px-4 py-3 btn-3d btn-3d-secondary text-xs"
+        >
+          🤝 Challenge
+        </button>
+      </div>
+      
+      <Link
+        to="/"
+        className="block w-full px-4 py-2.5 bg-transparent hover:bg-surface-base text-text-muted hover:text-text-primary text-center font-semibold rounded-xl text-xs transition-colors"
+      >
+        Home
+      </Link>
+    </div>
+  );
+};
+
 export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPlayAgain }: ResultScreenProps) {
   const { streak } = usePlayerStore();
   const [showConfetti, setShowConfetti] = useState(false);
@@ -24,18 +175,18 @@ export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPla
     }
   }, [isPersonalBest, result.won]);
 
-  const formatDuration = (ms: number) => {
-    const s = Math.floor(ms / 1000);
-    const m = Math.floor(s / 60);
-    const remainder = s % 60;
-    return m > 0 ? `${m}m ${remainder}s` : `${s}s`;
-  };
+  // Safe destructuring
+  const safeResult = result || {} as GameResult;
+  const momentsRaw = safeResult.moments || safeResult.data?.moments;
+  const moments = Array.isArray(momentsRaw) ? momentsRaw : [];
 
-  const moments = result.data?.moments as any[] | undefined;
-  const commentaryRaw = result.data?.commentary;
+  const commentaryRaw = safeResult.commentary || safeResult.data?.commentary;
   const commentary = Array.isArray(commentaryRaw) 
     ? commentaryRaw 
-    : (typeof commentaryRaw === 'string' ? [commentaryRaw] : undefined);
+    : (typeof commentaryRaw === 'string' ? [commentaryRaw] : []);
+
+  const safeXpGained = Number.isFinite(xpGained) ? xpGained : 0;
+  const currentStreak = streak?.currentStreak && Number.isFinite(streak.currentStreak) ? streak.currentStreak : 0;
 
   return (
     <>
@@ -43,51 +194,15 @@ export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPla
       <div className="fixed inset-0 z-50 bg-surface-base/90 backdrop-blur-md flex items-center justify-center p-4 animate-[fade-in_0.2s_ease-out]">
         <div className="w-full max-w-sm bg-surface-raised border border-border-default rounded-2xl overflow-hidden animate-[scale-in_0.3s_ease-out] text-center">
           <div className="p-6">
-            {/* Result */}
-            <div className="mb-5">
-              <div className="text-3xl mb-2 animate-[bounce-in_0.5s_ease-out]">
-                {result.won ? '🎉' : '💪'}
-              </div>
-              <h2 className="text-xl font-bold mb-1">
-                {result.won ? 'You Win!' : 'Game Over'}
-              </h2>
-            </div>
-
-            {/* Score */}
-            <div className="mb-5">
-              <div
-                className="text-4xl font-bold font-mono tabular-nums animate-[pop_0.4s_ease-out]"
-                style={{ color: game.color }}
-              >
-                {result.score.toLocaleString()}
-              </div>
-
-              {/* Personal Best Badge */}
-              {isPersonalBest && (
-                <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-status-success/10 text-status-success rounded-full text-xs font-semibold animate-[pop_0.5s_ease-out]">
-                  ⭐ New Personal Best!
-                </div>
-              )}
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <div className="bg-surface-base rounded-xl p-3">
-                <div className="text-text-muted text-xs mb-0.5">Duration</div>
-                <div className="font-mono text-sm font-semibold">{formatDuration(result.duration)}</div>
-              </div>
-              <div className="bg-surface-base rounded-xl p-3">
-                <div className="text-text-muted text-xs mb-0.5">Moves</div>
-                <div className="font-mono text-sm font-semibold">{result.moves || '—'}</div>
-              </div>
-            </div>
+            <ResultSummary result={safeResult} game={game} isPersonalBest={isPersonalBest} />
+            <ResultStats result={safeResult} />
 
             {/* XP Gain */}
-            {xpGained > 0 && (
+            {safeXpGained > 0 && (
               <div className="mb-5 bg-surface-base rounded-xl p-3 animate-[slide-up_0.4s_ease-out_0.3s_both]">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs text-text-muted">XP Earned</span>
-                  <span className="text-sm font-bold text-xp-bar">+{xpGained} XP</span>
+                  <span className="text-sm font-bold text-xp-bar">+{safeXpGained} XP</span>
                 </div>
                 <div className="xp-bar">
                   <div className="xp-bar-fill" style={{ width: '60%', animation: 'progress-fill 1s ease-out 0.5s both' }} />
@@ -96,95 +211,17 @@ export function ResultScreen({ game, result, isPersonalBest, xpGained = 0, onPla
             )}
 
             {/* Streak */}
-            {streak && streak.currentStreak > 0 && (
+            {currentStreak > 0 && (
               <div className="mb-5 flex items-center justify-center gap-2 text-sm">
                 <span>🔥</span>
-                <span className="text-status-warning font-semibold">{streak.currentStreak} day streak</span>
+                <span className="text-status-warning font-semibold">{currentStreak} day streak</span>
               </div>
             )}
 
-            {/* Game-specific data */}
-            {result.data && Object.keys(result.data).length > 0 && (
-              <div className="mb-5 text-sm">
-                {'wpm' in result.data && Boolean(result.data.wpm) && (
-                  <div className="text-text-secondary">
-                    <span className="font-mono font-bold" style={{ color: game.color }}>{String(result.data.wpm)}</span> WPM
-                    {'accuracy' in result.data && Boolean(result.data.accuracy) && <span className="text-text-muted"> · {String(result.data.accuracy)}% accuracy</span>}
-                  </div>
-                )}
-                {'reactionTime' in result.data && Boolean(result.data.reactionTime) && (
-                  <div className="text-text-secondary">
-                    <span className="font-mono font-bold" style={{ color: game.color }}>{String(result.data.reactionTime)}</span>ms average
-                  </div>
-                )}
-                {'bestTile' in result.data && Boolean(result.data.bestTile) && (
-                  <div className="text-text-secondary">
-                    Best tile: <span className="font-mono font-bold" style={{ color: game.color }}>{String(result.data.bestTile)}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Moments & Commentary */}
-            {moments && moments.length > 0 && (
-              <div className="mb-4 flex flex-wrap justify-center gap-2">
-                {moments.map((m: any) => (
-                  <span key={m.id} className="px-2 py-1 bg-surface-base border border-border-default rounded-full text-xs font-bold text-hrsh-accent animate-[scale-in_0.3s_ease-out]">
-                    ✨ {m.type.replace('_', ' ')}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {commentary && commentary.length > 0 && (
-              <div className="mb-6 p-4 bg-surface-base rounded-xl border border-border-default italic text-sm text-text-secondary">
-                {commentary.map((line: string, i: number) => (
-                  <p key={i} className={i > 0 ? "mt-2" : ""}>"{line}"</p>
-                ))}
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="space-y-4">
-              <button
-                onClick={onPlayAgain}
-                autoFocus
-                className="w-full px-4 py-3.5 btn-3d btn-3d-primary text-sm"
-              >
-                Play Again
-              </button>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => {
-                    import('../../engine/ShareEngine').then(({ ShareEngine }) => {
-                      ShareEngine.shareResult(game.id, result.score, result.data);
-                    });
-                  }}
-                  className="px-4 py-3 btn-3d btn-3d-secondary text-xs"
-                >
-                  📤 Share
-                </button>
-                <button
-                  onClick={() => {
-                    const challengeId = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    import('../../engine/ShareEngine').then(({ ShareEngine }) => {
-                      ShareEngine.shareChallenge(game.id, challengeId);
-                    });
-                  }}
-                  className="px-4 py-3 btn-3d btn-3d-secondary text-xs"
-                >
-                  🤝 Challenge
-                </button>
-              </div>
-              
-              <Link
-                to="/"
-                className="block w-full px-4 py-2.5 bg-transparent hover:bg-surface-base text-text-muted hover:text-text-primary text-center font-semibold rounded-xl text-xs transition-colors"
-              >
-                Home
-              </Link>
-            </div>
+            <ResultGameData result={safeResult} game={game} />
+            <ResultMoments moments={moments} />
+            <ResultCommentary commentary={commentary} />
+            <ResultActions onPlayAgain={onPlayAgain} game={game} result={safeResult} />
           </div>
         </div>
       </div>

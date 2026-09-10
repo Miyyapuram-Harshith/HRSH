@@ -209,7 +209,7 @@ function TypingGame({ onGameStart, onGameEnd, onScoreUpdate, isPaused, multiplay
       onMatchFinished(1, wpm); // 100% progress
     } else if (!isMultiplayer) {
       const result: GameResult = {
-        gameId: 'typing-test',
+        gameId: 'typing',
         mode: `${duration}s`,
         score: wpm,
         won: wpm >= 30,
