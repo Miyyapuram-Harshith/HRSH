@@ -38,7 +38,7 @@ export function Footer() {
         {/* Copyright */}
         <div className="mt-6 pt-4 border-t border-border-subtle">
           <p className="text-xs text-text-muted">
-            © {year} Articlarity. HRSH is a product of Articlarity.
+            © {year} Articlarity. HRSH is a product of Articlarity. Developed & Managed by Harshith.
           </p>
         </div>
       </div>
